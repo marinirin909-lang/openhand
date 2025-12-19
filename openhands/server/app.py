@@ -62,6 +62,15 @@ app_lifespan_ = get_app_lifespan_service()
 if app_lifespan_:
     lifespans.append(app_lifespan_.lifespan)
 
+# Add telemetry lifespan for enterprise mode
+try:
+    from enterprise.server.telemetry.lifecycle import telemetry_lifespan
+
+    lifespans.append(telemetry_lifespan)
+except ImportError:
+    # Not running in enterprise mode, skip telemetry
+    pass
+
 
 app = FastAPI(
     title='OpenHands',
