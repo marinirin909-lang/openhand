@@ -41,15 +41,15 @@ export function GitControlBarPushButton({
       className={cn(
         "flex flex-row gap-1 items-center justify-center px-2 py-1 rounded-[100px] w-[77px] min-w-[77px]",
         isButtonEnabled
-          ? "bg-[#25272D] hover:bg-[#454545] cursor-pointer"
-          : "bg-[rgba(71,74,84,0.50)] cursor-not-allowed",
+          ? "bg-surface hover:bg-tertiary cursor-pointer"
+          : "bg-glass-disabled cursor-not-allowed",
       )}
     >
       <div className="w-3 h-3 flex items-center justify-center">
         <ArrowUpIcon width={12} height={12} color="white" />
       </div>
       <div
-        className="font-normal text-white text-sm leading-5 max-w-[77px] truncate"
+        className="font-normal text-content text-sm leading-5 max-w-[77px] truncate"
         title={t(I18nKey.COMMON$PUSH)}
       >
         {t(I18nKey.COMMON$PUSH)}

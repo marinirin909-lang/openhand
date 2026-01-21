@@ -50,8 +50,8 @@ function ServedApp() {
   if (!currentActiveHost) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full p-10">
-        <ServerProcessIcon width={113} height={113} color="#A1A1A1" />
-        <span className="text-[#8D95A9] text-[19px] font-normal leading-5">
+        <ServerProcessIcon width={113} height={113} className="text-muted" />
+        <span className="text-subtle text-[19px] font-normal leading-5">
           {t(I18nKey.BROWSER$SERVER_MESSAGE)}
         </span>
       </div>
@@ -60,7 +60,7 @@ function ServedApp() {
 
   return (
     <div className="h-full w-full">
-      <div className="w-full p-2 flex items-center gap-4 border-b border-neutral-600">
+      <div className="w-full p-2 flex items-center gap-4 border-b border-stroke-alt">
         <button
           type="button"
           onClick={() => window.open(fullUrl, "_blank")}

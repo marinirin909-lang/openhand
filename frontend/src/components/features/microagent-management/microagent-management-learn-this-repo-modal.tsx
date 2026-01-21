@@ -61,7 +61,7 @@ export function MicroagentManagementLearnThisRepoModal({
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <h2
-                className="text-white text-xl font-medium"
+                className="text-content text-xl font-medium"
                 data-testid="modal-title"
               >
                 {t(I18nKey.MICROAGENT_MANAGEMENT$LEARN_THIS_REPO_MODAL_TITLE)}
@@ -81,11 +81,11 @@ export function MicroagentManagementLearnThisRepoModal({
               className="cursor-pointer"
               data-testid="modal-close-button"
             >
-              <XIcon width={24} height={24} color="#F9FBFE" />
+              <XIcon width={24} height={24} className="text-content" />
             </button>
           </div>
           <span
-            className="text-white text-sm font-normal"
+            className="text-content text-sm font-normal"
             data-testid="modal-description"
           >
             {t(I18nKey.MICROAGENT_MANAGEMENT$LEARN_THIS_REPO_MODAL_DESCRIPTION)}
@@ -114,8 +114,8 @@ export function MicroagentManagementLearnThisRepoModal({
               )}
               rows={6}
               className={cn(
-                "bg-tertiary border border-[#717888] bg-[#454545] w-full rounded-sm p-2 placeholder:italic placeholder:text-tertiary-alt resize-none",
-                "disabled:bg-[#2D2F36] disabled:border-[#2D2F36] disabled:cursor-not-allowed",
+                "bg-tertiary border border-stroke w-full rounded-sm p-2 placeholder:italic placeholder:text-tertiary-alt resize-none",
+                "disabled:bg-surface-disabled disabled:border-surface-disabled disabled:cursor-not-allowed",
               )}
             />
           </label>

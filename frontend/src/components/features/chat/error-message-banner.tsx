@@ -28,7 +28,7 @@ export function ErrorMessageBanner({
 
   return (
     <div
-      className="w-full rounded-lg p-2 border border-[#FF0006] bg-[#4A0709] flex gap-2 items-start text-white"
+      className="w-full rounded-lg p-2 border border-danger-ring bg-danger-surface flex gap-2 items-start text-content"
       data-testid="error-message-banner"
     >
       <div className="min-w-0 flex-1">
@@ -76,7 +76,7 @@ export function ErrorMessageBanner({
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 rounded-md p-1 hover:bg-black/10 cursor-pointer"
+          className="shrink-0 rounded-md p-1 hover:bg-surface-hover cursor-pointer"
           aria-label={t(I18nKey.BUTTON$CLOSE)}
           data-testid="error-message-banner-dismiss"
         >

@@ -32,14 +32,14 @@ function PlannerTab() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-10">
-      <LessonPlanIcon width={109} height={109} color="#A1A1A1" />
-      <span className="text-[#8D95A9] text-[19px] font-normal leading-5 pb-9">
+      <LessonPlanIcon width={109} height={109} className="text-muted" />
+      <span className="text-subtle text-[19px] font-normal leading-5 pb-9">
         {t(I18nKey.PLANNER$EMPTY_MESSAGE)}
       </span>
       <button
         type="button"
         onClick={handlePlanClick}
-        className="flex w-[164px] h-[40px] p-2 justify-center items-center shrink-0 rounded-lg bg-white overflow-hidden text-black text-ellipsis font-sans text-[16px] not-italic font-normal leading-[20px] hover:cursor-pointer hover:opacity-80"
+        className="flex w-[164px] h-[40px] p-2 justify-center items-center shrink-0 rounded-lg bg-content overflow-hidden text-base text-ellipsis font-sans text-[16px] not-italic font-normal leading-[20px] hover:cursor-pointer hover:opacity-80"
       >
         {t(I18nKey.COMMON$CREATE_A_PLAN)}
       </button>

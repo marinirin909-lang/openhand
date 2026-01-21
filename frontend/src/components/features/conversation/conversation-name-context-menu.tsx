@@ -203,7 +203,7 @@ export function ConversationNameContextMenu({
           onClick={onTogglePublic}
           className={contextMenuListItemClassName}
         >
-          <div className="flex items-center gap-2 justify-between w-full hover:bg-[#5C5D62] rounded h-[30px]">
+          <div className="flex items-center gap-2 justify-between w-full hover:bg-surface-hover rounded h-[30px]">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -218,7 +218,7 @@ export function ConversationNameContextMenu({
                   type="button"
                   data-testid="copy-share-link-button"
                   onClick={onCopyShareLink}
-                  className="p-1 hover:bg-[#717888] rounded cursor-pointer"
+                  className="p-1 hover:bg-stroke rounded cursor-pointer"
                   title={t(I18nKey.BUTTON$COPY_TO_CLIPBOARD)}
                 >
                   <CopyIcon width={16} height={16} />
@@ -229,7 +229,7 @@ export function ConversationNameContextMenu({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="p-1 hover:bg-[#717888] rounded cursor-pointer"
+                  className="p-1 hover:bg-stroke rounded cursor-pointer"
                   title={t(I18nKey.BUTTON$OPEN_IN_NEW_TAB)}
                 >
                   <LinkIcon width={16} height={16} />

@@ -132,7 +132,7 @@ export function LoginContent({
         <OpenHandsLogoWhite width={106} height={72} />
       </div>
 
-      <h1 className="text-[39px] leading-5 font-medium text-white text-center">
+      <h1 className="text-[39px] leading-5 font-medium text-content text-center">
         {t(I18nKey.AUTH$LETS_GET_STARTED)}
       </h1>
 
@@ -163,7 +163,7 @@ export function LoginContent({
               <button
                 type="button"
                 onClick={handleGitHubAuth}
-                className={`${buttonBaseClasses} bg-[#9E28B0] text-white`}
+                className={`${buttonBaseClasses} bg-brand-github text-content-2`}
               >
                 <GitHubLogo width={14} height={14} className="shrink-0" />
                 <span className={buttonLabelClasses}>
@@ -176,7 +176,7 @@ export function LoginContent({
               <button
                 type="button"
                 onClick={handleGitLabAuth}
-                className={`${buttonBaseClasses} bg-[#FC6B0E] text-white`}
+                className={`${buttonBaseClasses} bg-brand-gitlab text-content-2`}
               >
                 <GitLabLogo width={14} height={14} className="shrink-0" />
                 <span className={buttonLabelClasses}>
@@ -189,7 +189,7 @@ export function LoginContent({
               <button
                 type="button"
                 onClick={handleBitbucketAuth}
-                className={`${buttonBaseClasses} bg-[#2684FF] text-white`}
+                className={`${buttonBaseClasses} bg-brand-bitbucket text-content-2`}
               >
                 <BitbucketLogo width={14} height={14} className="shrink-0" />
                 <span className={buttonLabelClasses}>
@@ -201,7 +201,7 @@ export function LoginContent({
         )}
       </div>
 
-      <TermsAndPrivacyNotice className="max-w-[320px] text-[#A3A3A3]" />
+      <TermsAndPrivacyNotice className="max-w-[320px] text-muted" />
     </div>
   );
 }

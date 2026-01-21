@@ -116,9 +116,9 @@ export function ChangeAgentButton() {
 
   const buttonIcon = useMemo(() => {
     if (isExecutionAgent) {
-      return <CodeTagIcon width={18} height={18} color="#737373" />;
+      return <CodeTagIcon width={18} height={18} className="text-subtle" />;
     }
-    return <LessonPlanIcon width={18} height={18} color="#ffffff" />;
+    return <LessonPlanIcon width={18} height={18} className="text-content" />;
   }, [isExecutionAgent]);
 
   if (!shouldUsePlanningAgent) {
@@ -132,8 +132,8 @@ export function ChangeAgentButton() {
         onClick={handleButtonClick}
         disabled={isButtonDisabled}
         className={cn(
-          "flex items-center border border-[#4B505F] rounded-[100px] transition-opacity",
-          !isExecutionAgent && "border-[#597FF4] bg-[#4A67BD]",
+          "flex items-center border border-stroke-alt rounded-[100px] transition-opacity",
+          !isExecutionAgent && "border-primary bg-primary",
           isButtonDisabled
             ? "opacity-50 cursor-not-allowed"
             : "cursor-pointer hover:opacity-80",
@@ -141,11 +141,11 @@ export function ChangeAgentButton() {
       >
         <div className="flex items-center gap-1 pl-1.5">
           {buttonIcon}
-          <Typography.Text className="text-white text-2.75 not-italic font-normal leading-5">
+          <Typography.Text className="text-content text-2.75 not-italic font-normal leading-5">
             {buttonLabel}
           </Typography.Text>
         </div>
-        <ChevronDownSmallIcon width={24} height={24} color="#ffffff" />
+        <ChevronDownSmallIcon width={24} height={24} className="text-content" />
       </button>
       {contextMenuOpen && (
         <ChangeAgentContextMenu
