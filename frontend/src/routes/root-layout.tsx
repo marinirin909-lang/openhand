@@ -30,6 +30,7 @@ import { MaintenanceBanner } from "#/components/features/maintenance/maintenance
 import { cn, isMobileDevice } from "#/utils/utils";
 import { LoadingSpinner } from "#/components/shared/loading-spinner";
 import { useAppTitle } from "#/hooks/use-app-title";
+import { ModalRoot } from "#/components/shared/modals/modal-orchestrator";
 
 export function ErrorBoundary() {
   const error = useRouteError();
@@ -251,6 +252,8 @@ export default function MainApp() {
       {config.data?.FEATURE_FLAGS.ENABLE_BILLING &&
         config.data?.APP_MODE === "saas" &&
         settings?.is_new_user && <SetupPaymentModal />}
+
+      <ModalRoot />
     </div>
   );
 }
