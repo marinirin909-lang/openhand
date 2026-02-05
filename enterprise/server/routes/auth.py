@@ -176,22 +176,14 @@ async def keycloak_callback(
 
     email = user_info.get('email')
     user_id = user_info['sub']
-    user = await UserStore.get_user_by_id_async(user_id)
-    if not user:
-        user = await UserStore.create_user(user_id, user_info)
 
-    if not user:
-        logger.error(f'Failed to authenticate user {user_info["preferred_username"]}')
-        return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={
-                'error': f'Failed to authenticate user {user_info["preferred_username"]}'
-            },
-        )
-
-    logger.info(f'Logging in user {str(user.id)} in org {user.current_org_id}')
+    # Check if this is a new user (for logging purposes)
+    existing_user = await UserStore.get_user_by_id_async(user_id)
+    is_new_user = existing_user is None
 
     # reCAPTCHA verification with Account Defender
+    # IMPORTANT: This must happen BEFORE user creation to prevent
+    # spammers/bots from creating accounts before being blocked
     if RECAPTCHA_SITE_KEY:
         if not recaptcha_token:
             logger.warning(
@@ -199,6 +191,7 @@ async def keycloak_callback(
                 extra={
                     'user_id': user_id,
                     'email': email,
+                    'is_new_user': is_new_user,
                 },
             )
             error_url = f'{request.base_url}login?recaptcha_blocked=true'
@@ -229,6 +222,7 @@ async def keycloak_callback(
                         'user_ip': user_ip,
                         'score': result.score,
                         'user_id': user_id,
+                        'is_new_user': is_new_user,
                     },
                 )
                 # Redirect to home with error parameter
@@ -238,6 +232,23 @@ async def keycloak_callback(
         except Exception as e:
             logger.exception(f'reCAPTCHA verification error at callback: {e}')
             # Fail open - continue with login if reCAPTCHA service unavailable
+
+    # Create user AFTER reCAPTCHA check passes
+    # This prevents blocked users from having accounts created
+    user = existing_user
+    if not user:
+        user = await UserStore.create_user(user_id, user_info)
+
+    if not user:
+        logger.error(f'Failed to authenticate user {user_info["preferred_username"]}')
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                'error': f'Failed to authenticate user {user_info["preferred_username"]}'
+            },
+        )
+
+    logger.info(f'Logging in user {str(user.id)} in org {user.current_org_id}')
 
     # Check if email domain is blocked
     if email and domain_blocker.is_domain_blocked(email):
