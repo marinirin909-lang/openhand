@@ -106,13 +106,13 @@ class SaasSettingsStore(SettingsStore):
             },
         }
         kwargs['llm_api_key'] = org_member.llm_api_key
-        if org_member.max_iterations:
+        if org_member.max_iterations is not None:
             kwargs['max_iterations'] = org_member.max_iterations
-        if org_member.llm_model:
+        if org_member.llm_model is not None:
             kwargs['llm_model'] = org_member.llm_model
-        if org_member.llm_api_key_for_byor:
+        if org_member.llm_api_key_for_byor is not None:
             kwargs['llm_api_key_for_byor'] = org_member.llm_api_key_for_byor
-        if org_member.llm_base_url:
+        if org_member.llm_base_url is not None:
             kwargs['llm_base_url'] = org_member.llm_base_url
         if org.v1_enabled is None:
             kwargs['v1_enabled'] = True
@@ -161,10 +161,9 @@ class SaasSettingsStore(SettingsStore):
                 return None
 
             # Check if we need to generate an LLM key.
-            if item.llm_base_url == LITE_LLM_API_URL:
-                await self._ensure_api_key(
-                    item, str(org_id), openhands_type=self._is_openhands_provider(item)
-                )
+            is_openhands_provider = self._is_openhands_provider(item)
+            if is_openhands_provider or item.llm_base_url == LITE_LLM_API_URL:
+                await self._ensure_api_key(item, str(org_id), is_openhands_provider)
 
             kwargs = item.model_dump(context={'expose_secrets': True})
             for model in (user, org, org_member):
