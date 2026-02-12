@@ -119,7 +119,7 @@ class SetAuthCookieMiddleware:
                     jwt_secret.get_secret_value(),
                     algorithms=['HS256'],
                 )
-                accepted_tos = decoded.get('accepted_tos')
+                accepted_tos = decoded.get('accepted_tos') or False
             except jwt.exceptions.InvalidSignatureError:
                 # If we can't decode the token, treat it as an auth error
                 logger.warning('Invalid JWT signature detected')
