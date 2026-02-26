@@ -131,16 +131,12 @@ def test_localhost_cors_middleware_web_host_allows_origin(app):
         # Test with https origin
         response = client.get('/test', headers={'Origin': 'https://example.com'})
         assert response.status_code == 200
-        assert (
-            response.headers['access-control-allow-origin'] == 'https://example.com'
-        )
+        assert response.headers['access-control-allow-origin'] == 'https://example.com'
 
         # Test with http origin
         response = client.get('/test', headers={'Origin': 'http://example.com'})
         assert response.status_code == 200
-        assert (
-            response.headers['access-control-allow-origin'] == 'http://example.com'
-        )
+        assert response.headers['access-control-allow-origin'] == 'http://example.com'
 
         # Test with disallowed origin
         response = client.get('/test', headers={'Origin': 'https://other.com'})
@@ -191,9 +187,7 @@ def test_localhost_cors_middleware_localhost_works_with_web_host(app):
         # External origin should work
         response = client.get('/test', headers={'Origin': 'https://example.com'})
         assert response.status_code == 200
-        assert (
-            response.headers['access-control-allow-origin'] == 'https://example.com'
-        )
+        assert response.headers['access-control-allow-origin'] == 'https://example.com'
 
         # Localhost should ALSO still work
         response = client.get('/test', headers={'Origin': 'http://localhost:3000'})
@@ -202,13 +196,10 @@ def test_localhost_cors_middleware_localhost_works_with_web_host(app):
             response.headers['access-control-allow-origin'] == 'http://localhost:3000'
         )
 
-        response = client.get(
-            '/test', headers={'Origin': 'http://127.0.0.1:3000'}
-        )
+        response = client.get('/test', headers={'Origin': 'http://127.0.0.1:3000'})
         assert response.status_code == 200
         assert (
-            response.headers['access-control-allow-origin']
-            == 'http://127.0.0.1:3000'
+            response.headers['access-control-allow-origin'] == 'http://127.0.0.1:3000'
         )
 
 
@@ -221,9 +212,7 @@ def test_localhost_cors_middleware_localhost_works_with_permitted_origins(app):
         client = TestClient(app)
 
         # Configured origin should work
-        response = client.get(
-            '/test', headers={'Origin': 'https://prod.example.com'}
-        )
+        response = client.get('/test', headers={'Origin': 'https://prod.example.com'})
         assert response.status_code == 200
         assert (
             response.headers['access-control-allow-origin']
