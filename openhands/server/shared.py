@@ -17,6 +17,7 @@ from openhands.server.config.server_config import ServerConfig, load_server_conf
 from openhands.server.conversation_manager.conversation_manager import (
     ConversationManager,
 )
+from openhands.server.middleware import _resolve_cors_origins
 from openhands.server.monitoring import MonitoringListener
 from openhands.server.types import ServerConfigInterface
 from openhands.storage import get_file_store
@@ -51,9 +52,18 @@ if redis_host:
     )
 
 
+def _get_cors_origins() -> str | list[str]:
+    """Derive Socket.IO CORS origins from the same env vars as LocalhostCORSMiddleware."""
+    origins = _resolve_cors_origins()
+    if origins:
+        return list(origins)
+    # Default: allow all origins (localhost handled by HTTP CORS middleware)
+    return '*'
+
+
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*',
+    cors_allowed_origins=_get_cors_origins(),
     client_manager=client_manager,
     # Increase buffer size to 4MB (to handle 3MB files with base64 overhead)
     max_http_buffer_size=4 * 1024 * 1024,
