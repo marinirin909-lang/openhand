@@ -43,7 +43,7 @@ from openhands.server.user_auth import (
 app = APIRouter(prefix='/api/user', dependencies=get_dependencies())
 
 
-@app.get('/installations', response_model=list[str])
+@app.get('/installations', response_model=list[str], deprecated=True)
 async def get_user_installations(
     provider: ProviderType,
     provider_tokens: PROVIDER_TOKEN_TYPE | None = Depends(get_provider_tokens),
@@ -72,7 +72,7 @@ async def get_user_installations(
     raise AuthenticationError('Git provider token required. (such as GitHub).')
 
 
-@app.get('/repositories', response_model=list[Repository])
+@app.get('/repositories', response_model=list[Repository], deprecated=True)
 async def get_user_repositories(
     sort: str = 'pushed',
     selected_provider: Annotated[ProviderType | None, Query()] = None,
@@ -112,7 +112,7 @@ async def get_user_repositories(
     raise AuthenticationError('Git provider token required. (such as GitHub).')
 
 
-@app.get('/info', response_model=User)
+@app.get('/info', response_model=User, deprecated=True)
 async def get_user(
     provider_tokens: PROVIDER_TOKEN_TYPE | None = Depends(get_provider_tokens),
     access_token: SecretStr | None = Depends(get_access_token),
@@ -139,7 +139,7 @@ async def get_user(
     raise AuthenticationError('Git provider token required. (such as GitHub).')
 
 
-@app.get('/search/repositories', response_model=list[Repository])
+@app.get('/search/repositories', response_model=list[Repository], deprecated=True)
 async def search_repositories(
     query: str,
     per_page: int = 5,
@@ -174,7 +174,7 @@ async def search_repositories(
     raise AuthenticationError('Git provider token required.')
 
 
-@app.get('/search/branches', response_model=list[Branch])
+@app.get('/search/branches', response_model=list[Branch], deprecated=True)
 async def search_branches(
     repository: str,
     query: str,
@@ -217,7 +217,7 @@ async def search_branches(
     )
 
 
-@app.get('/suggested-tasks', response_model=list[SuggestedTask])
+@app.get('/suggested-tasks', response_model=list[SuggestedTask], deprecated=True)
 async def get_suggested_tasks(
     provider_tokens: PROVIDER_TOKEN_TYPE | None = Depends(get_provider_tokens),
     access_token: SecretStr | None = Depends(get_access_token),
@@ -246,7 +246,9 @@ async def get_suggested_tasks(
     raise AuthenticationError('No providers set.')
 
 
-@app.get('/repository/branches', response_model=PaginatedBranchesResponse)
+@app.get(
+    '/repository/branches', response_model=PaginatedBranchesResponse, deprecated=True
+)
 async def get_repository_branches(
     repository: str,
     page: int = 1,
@@ -306,6 +308,7 @@ def _extract_repo_name(repository_name: str) -> str:
 
 @app.get(
     '/repository/{repository_name:path}/microagents',
+    deprecated=True,
     response_model=list[MicroagentResponse],
 )
 async def get_repository_microagents(
@@ -369,6 +372,7 @@ async def get_repository_microagents(
 
 @app.get(
     '/repository/{repository_name:path}/microagents/content',
+    deprecated=True,
     response_model=MicroagentContentResponse,
 )
 async def get_repository_microagent_content(

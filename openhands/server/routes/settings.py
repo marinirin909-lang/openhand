@@ -42,6 +42,7 @@ app = APIRouter(prefix='/api', dependencies=get_dependencies())
 
 @app.get(
     '/settings',
+    deprecated=True,
     response_model=GETSettingsModel,
     responses={
         404: {'description': 'Settings not found', 'model': dict},
@@ -115,6 +116,7 @@ async def load_settings(
 
 @app.post(
     '/reset-settings',
+    deprecated=True,
     responses={
         410: {
             'description': 'Reset settings functionality has been removed',
@@ -173,6 +175,7 @@ async def store_llm_settings(
 # parameter and maintain proper type annotations for mypy.
 @app.post(
     '/settings',
+    deprecated=True,
     response_model=None,
     responses={
         200: {'description': 'Settings stored successfully', 'model': dict},
