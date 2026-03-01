@@ -1495,7 +1495,7 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
 class LiveStatusAppConversationServiceInjector(AppConversationServiceInjector):
     sandbox_startup_timeout: int = Field(
-        default=120, description='The max timeout time for sandbox startup'
+        default=600, description='The max timeout time for sandbox startup'
     )
     sandbox_startup_poll_frequency: int = Field(
         default=2, description='The frequency to poll for sandbox readiness'

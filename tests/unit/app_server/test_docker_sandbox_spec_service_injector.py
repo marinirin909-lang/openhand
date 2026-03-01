@@ -360,7 +360,9 @@ class TestDockerSandboxSpecServiceInjector:
         assert len(specs) == 1
         assert isinstance(specs[0], SandboxSpecInfo)
         assert specs[0].id.startswith('ghcr.io/openhands/agent-server:')
-        assert specs[0].id.endswith('-python')
+        # The ID format is: ghcr.io/openhands/agent-server:<hash>-python or
+        # ghcr.io/openhands/agent-server:<hash>-python-<arch> (e.g., -python-amd64)
+        assert '-python' in specs[0].id
         assert specs[0].command == ['--port', '8000']
         assert 'OPENVSCODE_SERVER_ROOT' in specs[0].initial_env
         assert 'OH_ENABLE_VNC' in specs[0].initial_env

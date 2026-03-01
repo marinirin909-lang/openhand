@@ -1,9 +1,11 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Union
+from urllib.parse import urlparse
 from uuid import UUID
 
 import base62
@@ -113,21 +115,51 @@ class RemoteSandboxService(SandboxService):
     user_context: UserContext
     httpx_client: httpx.AsyncClient
     db_session: AsyncSession
+    # Flag to control whether to reuse the cached httpx client or create a new one.
+    # When True (default), uses the injected client for efficiency.
+    # When False, creates a new client for each request to avoid DNS caching issues.
+    reuse_httpx_client: bool = True
 
     async def _send_runtime_api_request(
         self, method: str, path: str, **kwargs: Any
     ) -> httpx.Response:
-        """Send a request to the remote runtime API."""
+        """Send a request to the remote runtime API.
+
+        When reuse_httpx_client is False, creates a new client for each request
+        to work around DNS caching issues where newly allocated sandbox URLs
+        may not be immediately resolvable externally.
+        """
+        url = self.api_url + path
+        headers = {'X-API-Key': self.api_key}
+
+        # Create a fresh client to force new DNS resolution for each request
+        if not self.reuse_httpx_client:
+            async with httpx.AsyncClient(
+                timeout=self.httpx_client.timeout
+            ) as new_client:
+                try:
+                    return await new_client.request(
+                        method, url, headers=headers, **kwargs
+                    )
+                except httpx.HTTPError:
+                    # Keep reuse_httpx_client False for subsequent requests
+                    raise
+
+        # Default: reuse the injected client for efficiency
         try:
-            url = self.api_url + path
             return await self.httpx_client.request(
-                method, url, headers={'X-API-Key': self.api_key}, **kwargs
+                method, url, headers=headers, **kwargs
             )
         except httpx.TimeoutException:
             _logger.error(f'No response received within timeout for URL: {url}')
             raise
         except httpx.HTTPError as e:
-            _logger.error(f'HTTP error for URL {url}: {e}')
+            if self.reuse_httpx_client:
+                _logger.warning(
+                    f'HTTP error for URL {url}: {e}. Disabling httpx client reuse to '
+                    'force fresh DNS resolution for future requests.'
+                )
+            self.reuse_httpx_client = False
             raise
 
     def _to_sandbox_info(
@@ -137,17 +169,23 @@ class RemoteSandboxService(SandboxService):
 
         # Get session_api_key and exposed urls
         if runtime:
+            _logger.info(
+                f'Getting session_api_key and exposed urls for runtime: {runtime}'
+            )
             session_api_key = runtime['session_api_key']
             if status == SandboxStatus.RUNNING:
                 exposed_urls = []
                 url = runtime.get('url', None)
                 if url:
+                    _logger.info(f'Building exposed urls for runtime url: {url}')
+                    runtime_id = runtime['runtime_id']
+                    _logger.info(f'Runtime ID for URL building: {runtime_id}')
                     exposed_urls.append(
                         ExposedUrl(name=AGENT_SERVER, url=url, port=AGENT_SERVER_PORT)
                     )
                     vscode_url = (
-                        _build_service_url(url, 'vscode')
-                        + f'/?tkn={session_api_key}&folder=%2Fworkspace%2Fproject'
+                        _build_service_url(url, 'vscode', runtime_id)
+                        + f'?tkn={session_api_key}&folder=%2Fworkspace%2Fproject'
                     )
                     exposed_urls.append(
                         ExposedUrl(name=VSCODE, url=vscode_url, port=VSCODE_PORT)
@@ -155,14 +193,14 @@ class RemoteSandboxService(SandboxService):
                     exposed_urls.append(
                         ExposedUrl(
                             name=WORKER_1,
-                            url=_build_service_url(url, 'work-1'),
+                            url=_build_service_url(url, 'work-1', runtime_id),
                             port=WORKER_1_PORT,
                         )
                     )
                     exposed_urls.append(
                         ExposedUrl(
                             name=WORKER_2,
-                            url=_build_service_url(url, 'work-2'),
+                            url=_build_service_url(url, 'work-2', runtime_id),
                             port=WORKER_2_PORT,
                         )
                     )
@@ -172,6 +210,7 @@ class RemoteSandboxService(SandboxService):
             session_api_key = None
             exposed_urls = None
 
+        _logger.info(f'exposed_urls: {exposed_urls}')
         sandbox_spec_id = stored.sandbox_spec_id
         return SandboxInfo(
             id=stored.id,
@@ -196,8 +235,10 @@ class RemoteSandboxService(SandboxService):
 
         status = None
         pod_status = (runtime.get('pod_status') or '').lower()
+        _logger.info(f'pod status: {pod_status}')
         if pod_status:
             status = POD_STATUS_MAPPING.get(pod_status, None)
+        _logger.info(f'status: {status}')
 
         # If we failed to get the status from the pod status, fall back to status
         if status is None:
@@ -336,13 +377,18 @@ class RemoteSandboxService(SandboxService):
 
     async def get_sandbox(self, sandbox_id: str) -> Union[SandboxInfo, None]:
         """Get a single sandbox by checking its corresponding runtime."""
+        _logger.info(f'Getting sandbox with id: {sandbox_id}', stack_info=True)
         stored_sandbox = await self._get_stored_sandbox(sandbox_id)
         if stored_sandbox is None:
+            _logger.info('Got sandbox: None')
             return None
+        _logger.info(f'Got sandbox: {json.dumps(stored_sandbox.__dict__, default=str)}')
 
         runtime = None
         try:
+            _logger.info(f'Getting runtime for sandbox id: {stored_sandbox.id}')
             runtime = await self._get_runtime(stored_sandbox.id)
+            _logger.info(f'Got runtime: {runtime}')
         except Exception:
             _logger.exception(
                 f'Error getting runtime: {stored_sandbox.id}', stack_info=True
@@ -659,9 +705,21 @@ class RemoteSandboxService(SandboxService):
         return results
 
 
-def _build_service_url(url: str, service_name: str):
-    scheme, host_and_path = url.split('://')
-    return scheme + '://' + service_name + '-' + host_and_path
+def _build_service_url(url: str, service_name: str, runtime_id: str) -> str:
+    """Build a service URL for the given service name.
+
+    Handles both path-based and subdomain-based routing:
+    - Path mode (url path starts with /{runtime_id}): returns {scheme}://{netloc}/{runtime_id}/{service_name}
+    - Subdomain mode: returns {scheme}://{service_name}-{netloc}{path}
+    """
+    parsed = urlparse(url)
+    scheme, netloc, path = parsed.scheme, parsed.netloc, parsed.path or '/'
+    # Path mode if runtime_url path starts with /{id}
+    path_mode = path.startswith(f'/{runtime_id}')
+    if path_mode:
+        return f'{scheme}://{netloc}/{runtime_id}/{service_name}'
+    else:
+        return f'{scheme}://{service_name}-{netloc}{path}'
 
 
 async def poll_agent_servers(api_url: str, api_key: str, sleep_interval: int):
