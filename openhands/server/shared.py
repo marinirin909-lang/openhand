@@ -17,7 +17,7 @@ from openhands.server.config.server_config import ServerConfig, load_server_conf
 from openhands.server.conversation_manager.conversation_manager import (
     ConversationManager,
 )
-from openhands.server.middleware import _resolve_cors_origins
+from openhands.server.middleware import resolve_cors_origins
 from openhands.server.monitoring import MonitoringListener
 from openhands.server.types import ServerConfigInterface
 from openhands.storage import get_file_store
@@ -53,11 +53,23 @@ if redis_host:
 
 
 def _get_cors_origins() -> str | list[str]:
-    """Derive Socket.IO CORS origins from the same env vars as LocalhostCORSMiddleware."""
-    origins = _resolve_cors_origins()
+    """Derive Socket.IO CORS origins from the same env vars as LocalhostCORSMiddleware.
+
+    Socket.IO handles its own CORS independently of the FastAPI middleware stack,
+    so localhost must be explicitly included here as well.
+    """
+    origins = list(resolve_cors_origins())
     if origins:
-        return list(origins)
-    # Default: allow all origins (localhost handled by HTTP CORS middleware)
+        # Always include localhost for dev — mirrors LocalhostCORSMiddleware behavior.
+        # Use common dev ports; Socket.IO checks exact origin strings.
+        for host in ('localhost', '127.0.0.1'):
+            for port in (3000, 3001):
+                for scheme in ('http', 'https'):
+                    entry = f'{scheme}://{host}:{port}'
+                    if entry not in origins:
+                        origins.append(entry)
+        return origins
+    # No origins configured: allow all (open local/dev setup)
     return '*'
 
 

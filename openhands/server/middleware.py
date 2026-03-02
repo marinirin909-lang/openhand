@@ -21,16 +21,18 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 
-def _resolve_cors_origins() -> tuple[str, ...]:
+def resolve_cors_origins() -> tuple[str, ...]:
     """Resolve CORS allowed origins from environment variables.
 
     Priority: PERMITTED_CORS_ORIGINS > WEB_HOST > empty (localhost always allowed separately).
     """
     allow_origins_str = os.getenv('PERMITTED_CORS_ORIGINS')
     if allow_origins_str:
-        return tuple(origin.strip() for origin in allow_origins_str.split(','))
+        return tuple(
+            origin.strip() for origin in allow_origins_str.split(',') if origin.strip()
+        )
     # Fall back to WEB_HOST (the V1-standard external URL config)
-    web_host = os.getenv('WEB_HOST')
+    web_host = (os.getenv('WEB_HOST') or '').strip() or None
     if web_host:
         return (f'https://{web_host}', f'http://{web_host}')
     return ()
@@ -44,7 +46,7 @@ class LocalhostCORSMiddleware(CORSMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(
             app,
-            allow_origins=_resolve_cors_origins(),
+            allow_origins=resolve_cors_origins(),
             allow_credentials=True,
             allow_methods=['*'],
             allow_headers=['*'],
