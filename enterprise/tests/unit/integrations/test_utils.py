@@ -8,6 +8,7 @@ from integrations.utils import (
     append_conversation_footer,
     get_session_expired_message,
     get_summary_for_agent_state,
+    get_user_not_registered_message,
 )
 
 from openhands.core.schema.agent import AgentState
@@ -226,6 +227,73 @@ class TestGetSessionExpiredMessage:
         result = get_session_expired_message(None)
         assert not result.startswith('@')
         assert 'Your session' in result
+
+
+class TestGetUserNotRegisteredMessage:
+    """Test cases for get_user_not_registered_message function."""
+
+    def test_message_with_username_contains_at_prefix(self):
+        """Test that the message contains the username with @ prefix."""
+        result = get_user_not_registered_message('testuser')
+        assert '@testuser' in result
+
+    def test_message_with_username_contains_signup_text(self):
+        """Test that the message contains signup instruction text."""
+        result = get_user_not_registered_message('testuser')
+        assert "haven't signed up" in result
+
+    def test_message_with_username_contains_create_account_instruction(self):
+        """Test that the message contains create account instruction."""
+        result = get_user_not_registered_message('testuser')
+        assert 'create an account' in result
+
+    def test_message_with_username_mentions_github_login(self):
+        """Test that the message mentions using GitHub login."""
+        result = get_user_not_registered_message('testuser')
+        assert 'GitHub login' in result
+
+    def test_message_with_username_contains_host_url(self):
+        """Test that the message contains the OpenHands Cloud URL."""
+        result = get_user_not_registered_message('testuser')
+        assert HOST_URL in result
+        assert 'OpenHands Cloud' in result
+
+    def test_different_usernames(self):
+        """Test that different usernames produce different messages."""
+        result1 = get_user_not_registered_message('user1')
+        result2 = get_user_not_registered_message('user2')
+        assert '@user1' in result1
+        assert '@user2' in result2
+        assert '@user1' not in result2
+        assert '@user2' not in result1
+
+    def test_message_without_username_contains_signup_text(self):
+        """Test that the message without username contains signup instruction text."""
+        result = get_user_not_registered_message()
+        assert "haven't signed up" in result
+
+    def test_message_without_username_contains_create_account_instruction(self):
+        """Test that the message without username contains create account instruction."""
+        result = get_user_not_registered_message()
+        assert 'create an account' in result
+
+    def test_message_without_username_contains_host_url(self):
+        """Test that the message without username contains the OpenHands Cloud URL."""
+        result = get_user_not_registered_message()
+        assert HOST_URL in result
+        assert 'OpenHands Cloud' in result
+
+    def test_message_without_username_does_not_contain_at_prefix(self):
+        """Test that the message without username does not contain @ prefix."""
+        result = get_user_not_registered_message()
+        assert not result.startswith('@')
+        assert 'It looks like' in result
+
+    def test_message_with_none_username(self):
+        """Test that passing None explicitly works the same as no argument."""
+        result = get_user_not_registered_message(None)
+        assert not result.startswith('@')
+        assert 'It looks like' in result
 
 
 class TestAppendConversationFooter:

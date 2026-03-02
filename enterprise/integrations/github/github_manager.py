@@ -22,6 +22,7 @@ from integrations.utils import (
     HOST_URL,
     OPENHANDS_RESOLVER_TEMPLATES_DIR,
     get_session_expired_message,
+    get_user_not_registered_message,
 )
 from integrations.v1_utils import get_saas_user_auth
 from jinja2 import Environment, FileSystemLoader
@@ -179,9 +180,20 @@ class GithubManager(Manager):
         if await self.is_job_requested(message):
             payload = message.message.get('payload', {})
             user_id = payload['sender']['id']
+            username = payload['sender']['login']
             keycloak_user_id = await self.token_manager.get_user_id_from_idp_user_id(
                 user_id, ProviderType.GITHUB
             )
+
+            # Check if user is registered with OpenHands
+            if not keycloak_user_id:
+                logger.info(
+                    f'[GitHub] User {username} (GitHub ID: {user_id}) is not registered with OpenHands'
+                )
+                # Send a helpful message to the user
+                await self._send_user_not_registered_message(message, username)
+                return
+
             github_view = await GithubFactory.create_github_view_from_payload(
                 message, keycloak_user_id
             )
@@ -199,6 +211,74 @@ class GithubManager(Manager):
             # Add eyes reaction to acknowledge we've read the request
             self._add_reaction(github_view, 'eyes', installation_token)
             await self.start_job(github_view)
+
+    async def _send_user_not_registered_message(self, message: Message, username: str):
+        """Send a message to an unregistered user explaining how to sign up.
+
+        Args:
+            message: The incoming message containing installation and repo info
+            username: The GitHub username of the unregistered user
+        """
+        payload = message.message.get('payload', {})
+        installation_id = message.message['installation']
+        repo_obj = payload['repository']
+        full_repo_name = self._get_full_repo_name(repo_obj)
+
+        # Get installation token to post comment
+        installation_token = self._get_installation_access_token(installation_id)
+
+        # Determine issue/PR number based on payload type
+        issue_number = None
+        comment_id = None
+        is_inline_pr_comment = False
+
+        if 'issue' in payload:
+            issue_number = payload['issue']['number']
+            if 'comment' in payload:
+                comment_id = payload['comment']['id']
+        elif 'pull_request' in payload:
+            issue_number = payload['pull_request']['number']
+            if 'comment' in payload:
+                comment_id = payload['comment']['id']
+                # Check if this is an inline PR review comment
+                if payload.get(
+                    'action'
+                ) == 'created' and 'pull_request_review_id' in payload.get(
+                    'comment', {}
+                ):
+                    is_inline_pr_comment = True
+
+        if not issue_number:
+            logger.warning(
+                f'[GitHub] Could not determine issue/PR number for unregistered user message to {username}'
+            )
+            return
+
+        # Create the helpful message
+        not_registered_message = get_user_not_registered_message(username)
+
+        try:
+            with Github(auth=Auth.Token(installation_token)) as github_client:
+                repo = github_client.get_repo(full_repo_name)
+
+                if is_inline_pr_comment and comment_id:
+                    # Reply to inline PR review comment
+                    pr = repo.get_pull(issue_number)
+                    pr.create_review_comment_reply(
+                        comment_id=comment_id, body=not_registered_message
+                    )
+                else:
+                    # Post as regular issue/PR comment
+                    issue = repo.get_issue(number=issue_number)
+                    issue.create_comment(not_registered_message)
+
+            logger.info(
+                f'[GitHub] Sent user not registered message to {username} on {full_repo_name}#{issue_number}'
+            )
+        except Exception:
+            logger.exception(
+                f'[GitHub] Failed to send user not registered message to {username}'
+            )
 
     async def send_message(self, message: Message, github_view: ResolverViewInterface):
         installation_token = self.token_manager.load_org_token(

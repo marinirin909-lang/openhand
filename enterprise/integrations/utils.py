@@ -65,6 +65,25 @@ def get_session_expired_message(username: str | None = None) -> str:
     return f'Your session has expired. Please login again at [OpenHands Cloud]({HOST_URL}) and try again.'
 
 
+def get_user_not_registered_message(username: str | None = None) -> str:
+    """Get a user-friendly message when a user is not registered with OpenHands.
+
+    Used by integrations to notify users when they try to use the bot but
+    haven't signed up for OpenHands yet.
+
+    Args:
+        username: Optional username to mention in the message. If provided,
+                  the message will include @username prefix (used by Git providers
+                  like GitHub, GitLab, Slack). If None, returns a generic message.
+
+    Returns:
+        A formatted user not registered message
+    """
+    if username:
+        return f"@{username} it looks like you haven't signed up for OpenHands yet. Please create an account at [OpenHands Cloud]({HOST_URL}) using your GitHub login, then try again."
+    return f"It looks like you haven't signed up for OpenHands yet. Please create an account at [OpenHands Cloud]({HOST_URL}) and try again."
+
+
 # Toggle for solvability report feature
 ENABLE_SOLVABILITY_ANALYSIS = (
     os.getenv('ENABLE_SOLVABILITY_ANALYSIS', 'false').lower() == 'true'
