@@ -301,7 +301,9 @@ def test_resolve_cors_origins_empty_web_host():
 def test_resolve_cors_origins_filters_empty_entries():
     """Test that empty entries from trailing commas are filtered out."""
     with patch.dict(
-        os.environ, {'PERMITTED_CORS_ORIGINS': 'https://a.com,,https://b.com,'}, clear=True
+        os.environ,
+        {'PERMITTED_CORS_ORIGINS': 'https://a.com,,https://b.com,'},
+        clear=True,
     ):
         result = resolve_cors_origins()
         assert result == ('https://a.com', 'https://b.com')
