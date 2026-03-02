@@ -21,7 +21,7 @@ import { useAgentState } from "#/hooks/use-agent-state";
 import { useHandleBuildPlanClick } from "#/hooks/use-handle-build-plan-click";
 
 import { ScrollToBottomButton } from "#/components/shared/buttons/scroll-to-bottom-button";
-import { LoadingSpinner } from "#/components/shared/loading-spinner";
+import { Spinner } from "#/ui/spinner";
 import { ChatMessagesSkeleton } from "./chat-messages-skeleton";
 import { displayErrorToast } from "#/utils/custom-toast-handlers";
 import { useErrorMessageStore } from "#/stores/error-message-store";
@@ -277,7 +277,7 @@ export function ChatInterface() {
 
           {isChatLoading && !isReturningToConversation && (
             <div className="flex justify-center" data-testid="loading-spinner">
-              <LoadingSpinner size="small" />
+              <Spinner size="md" />
             </div>
           )}
 
