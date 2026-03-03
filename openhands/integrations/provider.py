@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 import httpx
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -46,7 +47,9 @@ from openhands.utils.http_session import httpx_verify_option
 
 class ProviderToken(BaseModel):
     token: SecretStr | None = Field(default=None)
-    user_id: str | None = Field(default=None)
+    user_id: str | None = Field(
+        default=None, validation_alias=AliasChoices('user_id', 'username')
+    )
     host: str | None = Field(default=None)
 
     model_config = ConfigDict(
@@ -65,7 +68,7 @@ class ProviderToken(BaseModel):
             # Cannot pass None to SecretStr
             if token_str is None:
                 token_str = ''  # type: ignore[unreachable]
-            user_id = token_value.get('user_id')
+            user_id = token_value.get('user_id') or token_value.get('username')
             host = token_value.get('host')
             return cls(token=SecretStr(token_str), user_id=user_id, host=host)
 
@@ -715,15 +718,30 @@ class ProviderHandler:
                         f'{protocol}://oauth2:{token_value}@{domain}/{repo_name}.git'
                     )
                 elif provider == ProviderType.BITBUCKET:
-                    # For Bitbucket, handle username:app_password format
+                    # Bitbucket API tokens are provided as "email:api_token" for Basic auth API calls.
+                    # Git operations use "username:token" format.
+                    bitbucket_username = self.provider_tokens[provider].user_id
+
                     if ':' in token_value:
-                        # App token format: username:app_password
-                        remote_url = (
-                            f'{protocol}://{token_value}@{domain}/{repo_name}.git'
-                        )
+                        login, token = token_value.split(':', 1)
+                        encoded_token = quote(token, safe='')
+
+                        if bitbucket_username:
+                            encoded_username = quote(bitbucket_username, safe='')
+                            remote_url = f'{protocol}://{encoded_username}:{encoded_token}@{domain}/{repo_name}.git'
+                        elif login and '@' not in login:
+                            encoded_username = quote(login, safe='')
+                            remote_url = f'{protocol}://{encoded_username}:{encoded_token}@{domain}/{repo_name}.git'
+                        else:
+                            remote_url = f'{protocol}://x-bitbucket-api-token-auth:{encoded_token}@{domain}/{repo_name}.git'
+
                     else:
-                        # Access token format: use x-token-auth
-                        remote_url = f'{protocol}://x-token-auth:{token_value}@{domain}/{repo_name}.git'
+                        encoded_token = quote(token_value, safe='')
+                        if bitbucket_username:
+                            encoded_username = quote(bitbucket_username, safe='')
+                            remote_url = f'{protocol}://{encoded_username}:{encoded_token}@{domain}/{repo_name}.git'
+                        else:
+                            remote_url = f'{protocol}://x-token-auth:{encoded_token}@{domain}/{repo_name}.git'
                 elif provider == ProviderType.AZURE_DEVOPS:
                     # Azure DevOps uses PAT with Basic auth
                     # Format: https://{anything}:{PAT}@dev.azure.com/{org}/{project}/_git/{repo}
