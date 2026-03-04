@@ -140,6 +140,9 @@ def config_from_env() -> AppServerConfig:
     from openhands.app_server.app_conversation.sql_app_conversation_start_task_service import (  # noqa: E501
         SQLAppConversationStartTaskServiceInjector,
     )
+    from openhands.app_server.event.aws_event_service import (
+        AwsEventServiceInjector,
+    )
     from openhands.app_server.event.filesystem_event_service import (
         FilesystemEventServiceInjector,
     )
@@ -174,7 +177,20 @@ def config_from_env() -> AppServerConfig:
     config: AppServerConfig = from_env(AppServerConfig, 'OH')  # type: ignore
 
     if config.event is None:
-        if os.environ.get('FILE_STORE') == 'google_cloud':
+        file_store = os.environ.get('FILE_STORE')
+        provider = os.environ.get('SHARED_EVENT_STORAGE_PROVIDER')
+        provider = provider.lower() if provider else None
+
+        # Check SHARED_EVENT_STORAGE_PROVIDER first, then fall back to FILE_STORE
+        if provider == 'aws':
+            # AWS S3 storage configuration
+            bucket_name = os.environ.get('FILE_STORE_PATH')
+            if not bucket_name:
+                raise ValueError(
+                    'FILE_STORE_PATH environment variable is required for S3 storage'
+                )
+            config.event = AwsEventServiceInjector(bucket_name=bucket_name)
+        elif provider == 'gcp' or file_store == 'google_cloud':
             # Legacy V0 google cloud storage configuration
             config.event = GoogleCloudEventServiceInjector(
                 bucket_name=os.environ.get('FILE_STORE_PATH')

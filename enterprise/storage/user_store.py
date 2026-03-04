@@ -9,6 +9,7 @@ from uuid import UUID
 
 from server.auth.token_manager import TokenManager
 from server.constants import (
+    DEFAULT_V1_ENABLED,
     LITE_LLM_API_URL,
     ORG_SETTINGS_VERSION,
     PERSONAL_WORKSPACE_VERSION_TO_MODEL,
@@ -890,6 +891,8 @@ class UserStore:
         from openhands.storage.data_models.settings import Settings
 
         settings = Settings(language='en', enable_proactive_conversation_starters=True)
+
+        settings.v1_enabled = DEFAULT_V1_ENABLED
 
         from storage.lite_llm_manager import LiteLlmManager
 
