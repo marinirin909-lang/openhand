@@ -114,15 +114,17 @@ def get_cookie_samesite(request: Request) -> Literal['lax', 'strict']:
     )
 
 
-def _extract_oauth_state(state: str | None) -> tuple[str, str | None, str | None]:
-    """Extract redirect URL, reCAPTCHA token, and invitation token from OAuth state.
+def _extract_oauth_state(
+    state: str | None,
+) -> tuple[str, str | None, str | None, str | None]:
+    """Extract redirect URL, reCAPTCHA token, invitation token, and login method from OAuth state.
 
     Returns:
-        Tuple of (redirect_url, recaptcha_token, invitation_token).
-        Tokens may be None.
+        Tuple of (redirect_url, recaptcha_token, invitation_token, login_method).
+        Tokens and login_method may be None.
     """
     if not state:
-        return '', None, None
+        return '', None, None, None
 
     try:
         # Try to decode as JSON (new format with reCAPTCHA and/or invitation)
@@ -131,10 +133,11 @@ def _extract_oauth_state(state: str | None) -> tuple[str, str | None, str | None
             state_data.get('redirect_url', ''),
             state_data.get('recaptcha_token'),
             state_data.get('invitation_token'),
+            state_data.get('login_method'),
         )
     except Exception:
         # Old format - state is just the redirect URL
-        return state, None, None
+        return state, None, None, None
 
 
 # Keep alias for backward compatibility
@@ -146,7 +149,7 @@ def _extract_recaptcha_state(state: str | None) -> tuple[str, str | None]:
     Returns:
         Tuple of (redirect_url, recaptcha_token). Token may be None.
     """
-    redirect_url, recaptcha_token, _ = _extract_oauth_state(state)
+    redirect_url, recaptcha_token, _, _ = _extract_oauth_state(state)
     return redirect_url, recaptcha_token
 
 
@@ -158,8 +161,10 @@ async def keycloak_callback(
     error: Optional[str] = None,
     error_description: Optional[str] = None,
 ):
-    # Extract redirect URL, reCAPTCHA token, and invitation token from state
-    redirect_url, recaptcha_token, invitation_token = _extract_oauth_state(state)
+    # Extract redirect URL, reCAPTCHA token, invitation token, and login method from state
+    redirect_url, recaptcha_token, invitation_token, login_method = (
+        _extract_oauth_state(state)
+    )
     if not redirect_url:
         redirect_url = str(request.base_url)
 
@@ -512,6 +517,13 @@ async def keycloak_callback(
                 redirect_url = f'{redirect_url}&invitation_error=true'
             else:
                 redirect_url = f'{redirect_url}?invitation_error=true'
+
+    # Add login_method to redirect URL so frontend can store it in local storage
+    if login_method:
+        if '?' in redirect_url:
+            redirect_url = f'{redirect_url}&login_method={login_method}'
+        else:
+            redirect_url = f'{redirect_url}?login_method={login_method}'
 
     # If the user hasn't accepted the TOS, redirect to the TOS page
     if not has_accepted_tos:

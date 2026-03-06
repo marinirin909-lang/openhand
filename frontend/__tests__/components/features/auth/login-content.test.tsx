@@ -353,4 +353,34 @@ describe("LoginContent", () => {
       }
     });
   });
+
+  it("should include login_method in state when clicking auth button", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <LoginContent
+          githubAuthUrl="https://github.com/login/oauth/authorize"
+          appMode="saas"
+          providersConfigured={["github"]}
+        />
+      </MemoryRouter>,
+    );
+
+    const githubButton = screen.getByRole("button", {
+      name: "GITHUB$CONNECT_TO_GITHUB",
+    });
+    await user.click(githubButton);
+
+    await waitFor(() => {
+      const redirectUrl = window.location.href;
+      expect(redirectUrl).toContain("state=");
+      const url = new URL(redirectUrl);
+      const state = url.searchParams.get("state");
+      if (state) {
+        const decodedState = JSON.parse(atob(state));
+        expect(decodedState.login_method).toBe("github");
+      }
+    });
+  });
 });
