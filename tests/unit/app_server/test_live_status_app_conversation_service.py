@@ -1989,6 +1989,186 @@ class TestLiveStatusAppConversationService:
         assert stdio_server['command'] == 'npx'
         assert stdio_server['env'] == {'TOKEN': 'value'}
 
+    @pytest.mark.asyncio
+    @patch(
+        'openhands.app_server.app_conversation.live_status_app_conversation_service.AsyncRemoteWorkspace'
+    )
+    async def test_start_app_conversation_exception_uses_extract_error_detail(
+        self, mock_remote_workspace_class
+    ):
+        """Test that _start_app_conversation uses extract_error_detail for exception handling."""
+        import httpx
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            AppConversationStartTaskStatus,
+        )
+
+        # Arrange
+        # Mock user context
+        self.mock_user_context.get_user_id = AsyncMock(return_value='test_user_123')
+        self.mock_user_context.get_user_info = AsyncMock(return_value=self.mock_user)
+
+        # Mock sandbox and sandbox spec
+        mock_sandbox_spec = Mock(spec=SandboxSpecInfo)
+        mock_sandbox_spec.working_dir = '/test/workspace'
+        self.mock_sandbox.sandbox_spec_id = str(uuid4())
+        self.mock_sandbox.id = str(uuid4())
+        self.mock_sandbox.session_api_key = 'test_session_key'
+        exposed_url = ExposedUrl(
+            name=AGENT_SERVER, url='http://agent-server:8000', port=60000
+        )
+        self.mock_sandbox.exposed_urls = [exposed_url]
+
+        self.mock_sandbox_service.get_sandbox = AsyncMock(
+            return_value=self.mock_sandbox
+        )
+        self.mock_sandbox_spec_service.get_sandbox_spec = AsyncMock(
+            return_value=mock_sandbox_spec
+        )
+
+        # Mock remote workspace
+        mock_remote_workspace = Mock()
+        mock_remote_workspace_class.return_value = mock_remote_workspace
+
+        # Mock the wait for sandbox and setup scripts
+        async def mock_wait_for_sandbox(task):
+            task.sandbox_id = self.mock_sandbox.id
+            yield task
+
+        async def mock_run_setup_scripts(task, sandbox, workspace, agent_server_url):
+            yield task
+
+        self.service._wait_for_sandbox_start = mock_wait_for_sandbox
+        self.service.run_setup_scripts = mock_run_setup_scripts
+
+        # Mock build start conversation request
+        mock_agent = Mock(spec=Agent)
+        mock_agent.llm = Mock(spec=LLM)
+        mock_agent.llm.model = 'gpt-4'
+        mock_start_request = Mock(spec=StartConversationRequest)
+        mock_start_request.agent = mock_agent
+        mock_start_request.model_dump.return_value = {'test': 'data'}
+
+        self.service._build_start_conversation_request_for_user = AsyncMock(
+            return_value=mock_start_request
+        )
+
+        # Create an httpx.HTTPStatusError to simulate an MCP auth failure
+        mock_response = httpx.Response(
+            500,
+            json={
+                'detail': 'Internal Server Error',
+                'exception': "Client error '401 Unauthorized' for url 'https://mcp.atlassian.com/v1/sse'",
+            },
+        )
+        mock_response._request = httpx.Request(
+            'POST', 'http://agent-server:8000/api/conversations'
+        )
+        http_error = httpx.HTTPStatusError(
+            message="Server error '500 Internal Server Error'",
+            request=mock_response.request,
+            response=mock_response,
+        )
+
+        # Make the HTTP post call raise the exception
+        self.mock_httpx_client.post = AsyncMock(side_effect=http_error)
+
+        # Create request
+        request = AppConversationStartRequest()
+
+        # Act
+        tasks = []
+        async for task in self.service._start_app_conversation(request):
+            tasks.append(task)
+
+        # Assert
+        final_task = tasks[-1]
+        assert final_task.status == AppConversationStartTaskStatus.ERROR
+        # The extract_error_detail function should extract the 'exception' field from JSON
+        assert 'mcp.atlassian.com' in final_task.detail
+        assert '401 Unauthorized' in final_task.detail
+
+    @pytest.mark.asyncio
+    @patch(
+        'openhands.app_server.app_conversation.live_status_app_conversation_service.AsyncRemoteWorkspace'
+    )
+    async def test_start_app_conversation_generic_exception_uses_extract_error_detail(
+        self, mock_remote_workspace_class
+    ):
+        """Test that _start_app_conversation uses extract_error_detail for generic exceptions."""
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            AppConversationStartTaskStatus,
+        )
+
+        # Arrange
+        # Mock user context
+        self.mock_user_context.get_user_id = AsyncMock(return_value='test_user_123')
+        self.mock_user_context.get_user_info = AsyncMock(return_value=self.mock_user)
+
+        # Mock sandbox and sandbox spec
+        mock_sandbox_spec = Mock(spec=SandboxSpecInfo)
+        mock_sandbox_spec.working_dir = '/test/workspace'
+        self.mock_sandbox.sandbox_spec_id = str(uuid4())
+        self.mock_sandbox.id = str(uuid4())
+        self.mock_sandbox.session_api_key = 'test_session_key'
+        exposed_url = ExposedUrl(
+            name=AGENT_SERVER, url='http://agent-server:8000', port=60000
+        )
+        self.mock_sandbox.exposed_urls = [exposed_url]
+
+        self.mock_sandbox_service.get_sandbox = AsyncMock(
+            return_value=self.mock_sandbox
+        )
+        self.mock_sandbox_spec_service.get_sandbox_spec = AsyncMock(
+            return_value=mock_sandbox_spec
+        )
+
+        # Mock remote workspace
+        mock_remote_workspace = Mock()
+        mock_remote_workspace_class.return_value = mock_remote_workspace
+
+        # Mock the wait for sandbox and setup scripts
+        async def mock_wait_for_sandbox(task):
+            task.sandbox_id = self.mock_sandbox.id
+            yield task
+
+        async def mock_run_setup_scripts(task, sandbox, workspace, agent_server_url):
+            yield task
+
+        self.service._wait_for_sandbox_start = mock_wait_for_sandbox
+        self.service.run_setup_scripts = mock_run_setup_scripts
+
+        # Mock build start conversation request
+        mock_agent = Mock(spec=Agent)
+        mock_agent.llm = Mock(spec=LLM)
+        mock_agent.llm.model = 'gpt-4'
+        mock_start_request = Mock(spec=StartConversationRequest)
+        mock_start_request.agent = mock_agent
+        mock_start_request.model_dump.return_value = {'test': 'data'}
+
+        self.service._build_start_conversation_request_for_user = AsyncMock(
+            return_value=mock_start_request
+        )
+
+        # Make the HTTP post call raise a generic exception
+        self.mock_httpx_client.post = AsyncMock(
+            side_effect=RuntimeError('Connection timeout')
+        )
+
+        # Create request
+        request = AppConversationStartRequest()
+
+        # Act
+        tasks = []
+        async for task in self.service._start_app_conversation(request):
+            tasks.append(task)
+
+        # Assert
+        final_task = tasks[-1]
+        assert final_task.status == AppConversationStartTaskStatus.ERROR
+        # For non-httpx exceptions, extract_error_detail returns str(exc)
+        assert 'Connection timeout' in final_task.detail
+
 
 class TestPluginHandling:
     """Test cases for plugin-related functionality in LiveStatusAppConversationService."""
