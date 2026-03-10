@@ -250,18 +250,25 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
             )
             assert sandbox_spec is not None
 
-            # Run setup scripts
+            # Run setup scripts (defer setup.sh to run via terminal tool later)
             remote_workspace = AsyncRemoteWorkspace(
                 host=agent_server_url,
                 api_key=sandbox.session_api_key,
                 working_dir=sandbox_spec.working_dir,
             )
             async for updated_task in self.run_setup_scripts(
-                task, sandbox, remote_workspace, agent_server_url
+                task,
+                sandbox,
+                remote_workspace,
+                agent_server_url,
+                defer_setup_script=True,
             ):
                 yield updated_task
 
-            # Build the start request
+            # Build the full start request (including initial_message with
+            # plugin params incorporated), but we'll send it WITHOUT the
+            # initial_message so we can run setup.sh through the terminal
+            # tool before the agent starts
             start_conversation_request = (
                 await self._build_start_conversation_request_for_user(
                     sandbox,
@@ -278,12 +285,18 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
                 )
             )
 
+            # Save the finalized initial message (with plugin params) and
+            # strip it from the start request so the conversation is created
+            # without triggering the agent loop
+            deferred_initial_message = start_conversation_request.initial_message
+            start_conversation_request.initial_message = None
+
             # update status
             task.status = AppConversationStartTaskStatus.STARTING_CONVERSATION
             task.agent_server_url = agent_server_url
             yield task
 
-            # Start conversation...
+            # Start conversation (without initial message — agent doesn't run yet)
             body_json = start_conversation_request.model_dump(
                 mode='json', context={'expose_secrets': True}
             )
@@ -296,6 +309,34 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
             response.raise_for_status()
             info = ConversationInfo.model_validate(response.json())
+
+            # Run setup.sh through the agent's terminal tool so environment
+            # changes persist in the agent's session
+            task.status = AppConversationStartTaskStatus.RUNNING_SETUP_SCRIPT
+            yield task
+            await self.run_setup_script_via_terminal_tool(
+                remote_workspace,
+                info.id.hex,
+                sandbox.session_api_key,
+            )
+
+            # Now send the initial message to start the agent loop
+            if deferred_initial_message:
+                initial_msg_payload = {
+                    'role': deferred_initial_message.role,
+                    'content': [
+                        c.model_dump(mode='json')
+                        for c in deferred_initial_message.content
+                    ],
+                    'run': True,
+                }
+                msg_response = await self.httpx_client.post(
+                    f'{agent_server_url}/api/conversations/{info.id.hex}/events',
+                    json=initial_msg_payload,
+                    headers={'X-Session-API-Key': sandbox.session_api_key},
+                    timeout=self.sandbox_startup_timeout,
+                )
+                msg_response.raise_for_status()
 
             # Store info...
             user_id = await self.user_context.get_user_id()

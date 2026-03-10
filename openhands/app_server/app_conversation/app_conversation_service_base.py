@@ -211,14 +211,16 @@ class AppConversationServiceBase(AppConversationService, ABC):
         sandbox: SandboxInfo,
         workspace: AsyncRemoteWorkspace,
         agent_server_url: str,
+        defer_setup_script: bool = False,
     ) -> AsyncGenerator[AppConversationStartTask, None]:
         task.status = AppConversationStartTaskStatus.PREPARING_REPOSITORY
         yield task
         await self.clone_or_init_git_repo(task, workspace)
 
-        task.status = AppConversationStartTaskStatus.RUNNING_SETUP_SCRIPT
-        yield task
-        await self.maybe_run_setup_script(workspace)
+        if not defer_setup_script:
+            task.status = AppConversationStartTaskStatus.RUNNING_SETUP_SCRIPT
+            yield task
+            await self.maybe_run_setup_script(workspace)
 
         task.status = AppConversationStartTaskStatus.SETTING_UP_GIT_HOOKS
         yield task
@@ -346,6 +348,55 @@ class AppConversationServiceBase(AppConversationService, ABC):
         # Add the action to the event stream as an ENVIRONMENT event
         # source = EventSource.ENVIRONMENT
         # self.event_stream.add_event(action, source)
+
+    async def run_setup_script_via_terminal_tool(
+        self,
+        workspace: AsyncRemoteWorkspace,
+        conversation_id: str,
+        session_api_key: str | None = None,
+    ) -> None:
+        """Run .openhands/setup.sh through the agent's terminal tool.
+
+        This executes the setup script in the agent's persistent terminal session,
+        ensuring that environment changes (exported variables, sourced files, etc.)
+        persist for the agent's subsequent commands.
+
+        Args:
+            workspace: The remote workspace
+            conversation_id: The conversation ID (hex string)
+            session_api_key: Optional API key for authentication
+        """
+        setup_script = workspace.working_dir + '/.openhands/setup.sh'
+        command = (
+            f'if [ -f {setup_script} ]; then '
+            f'chmod +x {setup_script} && source {setup_script}; '
+            f'fi'
+        )
+        try:
+            result = await workspace.execute_tool(
+                conversation_id=conversation_id,
+                tool_name='terminal',
+                action={'command': command, 'timeout': 600},
+                timeout=660.0,
+            )
+            is_error = result.get('is_error', False)
+            if is_error:
+                observation = result.get('observation', {})
+                _logger.warning(
+                    f'Setup script execution via terminal tool reported error: '
+                    f'{observation}'
+                )
+            else:
+                _logger.info(
+                    'Setup script executed via terminal tool (env changes persisted)'
+                )
+        except Exception as e:
+            _logger.warning(
+                f'Failed to run setup script via terminal tool, '
+                f'falling back to workspace API: {e}'
+            )
+            # Fall back to the workspace API (env changes won't persist)
+            await self.maybe_run_setup_script(workspace)
 
     async def maybe_setup_git_hooks(
         self,
