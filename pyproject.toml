@@ -130,7 +130,6 @@ test = [
   "pytest",
   "pytest-asyncio",
   "pytest-cov",
-  "pytest-forked",
   "pytest-playwright>=0.7",
   "pytest-timeout>=2.4",
   "pytest-xdist",
@@ -281,7 +280,6 @@ optional = true
 pytest = "*"
 pytest-cov = "*"
 pytest-asyncio = "*"
-pytest-forked = "*"
 pytest-xdist = "*"
 pytest-playwright = "^0.7.0"
 pytest-timeout = "^2.4.0"
