@@ -9,7 +9,6 @@ import { BrandButton } from "#/components/features/settings/brand-button";
 import { I18nKey } from "#/i18n/declaration";
 import OpenHandsLogoWhite from "#/assets/branding/openhands-logo-white.svg?react";
 import { useSubmitOnboarding } from "#/hooks/mutation/use-submit-onboarding";
-import { useTracking } from "#/hooks/use-tracking";
 import { ENABLE_ONBOARDING } from "#/utils/feature-flags";
 import { cn } from "#/utils/utils";
 import { ModalBackdrop } from "#/components/shared/modals/modal-backdrop";
@@ -136,7 +135,6 @@ function OnboardingForm() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { mutate: submitOnboarding } = useSubmitOnboarding();
-  const { trackOnboardingCompleted } = useTracking();
 
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
   const [selections, setSelections] = React.useState<Record<string, string>>(
@@ -158,15 +156,6 @@ function OnboardingForm() {
   const handleNext = () => {
     if (isLastStep) {
       submitOnboarding({ selections });
-      try {
-        trackOnboardingCompleted({
-          role: selections.step1,
-          orgSize: selections.step2,
-          useCase: selections.step3,
-        });
-      } catch (error) {
-        console.error("Failed to track onboarding:", error);
-      }
     } else {
       setCurrentStepIndex((prev) => prev + 1);
     }

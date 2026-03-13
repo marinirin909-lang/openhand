@@ -48,12 +48,6 @@ vi.mock("#/hooks/query/use-search-repositories", () => ({
   useSearchRepositories: () => mockUseSearchRepositories(),
 }));
 
-vi.mock("#/hooks/use-tracking", () => ({
-  useTracking: () => ({
-    trackEvent: vi.fn(),
-  }),
-}));
-
 vi.mock("#/hooks/use-create-conversation-and-subscribe-multiple", () => ({
   useCreateConversationAndSubscribeMultiple: () =>
     mockUseCreateConversationAndSubscribeMultiple(),

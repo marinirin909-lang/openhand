@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 import React from "react";
-import { usePostHog } from "posthog-js/react";
 import { useParams, useNavigate } from "react-router";
 import { transformVSCodeUrl } from "#/utils/vscode-url-helper";
 import useMetricsStore from "#/stores/metrics-store";
@@ -38,7 +37,6 @@ export function useConversationNameContextMenu({
   showOptions = false,
   onContextMenuToggle,
 }: UseConversationNameContextMenuProps) {
-  const posthog = usePostHog();
   const { t } = useTranslation();
   const { conversationId: currentConversationId } = useParams();
   const navigate = useNavigate();
@@ -137,7 +135,6 @@ export function useConversationNameContextMenu({
   ) => {
     event.preventDefault();
     event.stopPropagation();
-    posthog.capture("download_via_vscode_button_clicked");
 
     // Fetch the VS Code URL from the API
     if (conversationId) {

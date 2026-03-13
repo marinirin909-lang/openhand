@@ -24,6 +24,7 @@ from openhands.server.user_auth import (
     get_provider_tokens,
     get_secrets,
     get_secrets_store,
+    get_user_id,
 )
 from openhands.storage.data_models.secrets import Secrets
 from openhands.storage.data_models.settings import Settings
@@ -111,6 +112,7 @@ async def store_provider_tokens(
     provider_info: POSTProviderModel,
     secrets_store: SecretsStore = Depends(get_secrets_store),
     provider_tokens: PROVIDER_TOKEN_TYPE | None = Depends(get_provider_tokens),
+    user_id: str | None = Depends(get_user_id),
 ) -> JSONResponse:
     provider_err_msg = await check_provider_tokens(provider_info, provider_tokens)
     if provider_err_msg:
@@ -146,6 +148,39 @@ async def store_provider_tokens(
             update={'provider_tokens': provider_info.provider_tokens}
         )
         await secrets_store.store(updated_secrets)
+
+        # ACTV-02: git provider connected
+        try:
+            from openhands.analytics import analytics_constants, get_analytics_service
+
+            analytics = get_analytics_service()
+            if analytics and user_id and provider_info.provider_tokens:
+                from storage.user_store import UserStore
+
+                user_obj = await UserStore.get_user_by_id(user_id)
+                if user_obj:
+                    consented = user_obj.user_consents_to_analytics is True
+                    org_id_str = (
+                        str(user_obj.current_org_id)
+                        if user_obj.current_org_id
+                        else None
+                    )
+                    for (
+                        provider_type,
+                        token_value,
+                    ) in provider_info.provider_tokens.items():
+                        if token_value.token:  # Only fire for providers with actual token, not host-only updates
+                            analytics.capture(
+                                distinct_id=user_id,
+                                event=analytics_constants.GIT_PROVIDER_CONNECTED,
+                                properties={
+                                    'provider_type': provider_type.value,
+                                },
+                                org_id=org_id_str,
+                                consented=consented,
+                            )
+        except Exception:
+            logger.exception('analytics:git_provider_connected:failed')
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

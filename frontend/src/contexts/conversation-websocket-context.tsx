@@ -8,7 +8,6 @@ import React, {
   useRef,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 import { useWebSocket, WebSocketHookOptions } from "#/hooks/use-websocket";
 import { useEventStore } from "#/stores/use-event-store";
 import { useErrorMessageStore } from "#/stores/error-message-store";
@@ -42,7 +41,6 @@ import type {
 import EventService from "#/api/event-service/event-service.api";
 import { useConversationStore } from "#/stores/conversation-store";
 import { isBudgetOrCreditError, trackError } from "#/utils/error-handler";
-import { useTracking } from "#/hooks/use-tracking";
 import { useReadConversationFile } from "#/hooks/mutation/use-read-conversation-file";
 import useMetricsStore from "#/stores/metrics-store";
 import { I18nKey } from "#/i18n/declaration";
@@ -93,14 +91,12 @@ export function ConversationWebSocketProvider({
   const hasConnectedRefMain = React.useRef(false);
   const hasConnectedRefPlanning = React.useRef(false);
 
-  const posthog = usePostHog();
   const queryClient = useQueryClient();
   const { addEvent } = useEventStore();
   const { setErrorMessage, removeErrorMessage } = useErrorMessageStore();
   const { removeOptimisticUserMessage } = useOptimisticUserMessageStore();
   const { setExecutionStatus } = useV1ConversationStateStore();
   const { appendInput, appendOutput } = useCommandStore();
-  const { trackCreditLimitReached } = useTracking();
 
   // History loading state - separate per connection
   const [isLoadingHistoryMain, setIsLoadingHistoryMain] = useState(true);
@@ -356,13 +352,9 @@ export function ConversationWebSocketProvider({
                 eventId: event.id,
                 errorCode: event.code,
               },
-              posthog,
             });
             if (isBudgetOrCreditError(event.detail)) {
               setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
-              trackCreditLimitReached({
-                conversationId: conversationId || "unknown",
-              });
             } else {
               setErrorMessage(event.detail);
             }
@@ -381,14 +373,10 @@ export function ConversationWebSocketProvider({
                 toolName: event.tool_name,
                 toolCallId: event.tool_call_id,
               },
-              posthog,
             });
             // Use friendly i18n message for budget/credit errors instead of raw error
             if (isBudgetOrCreditError(event.error)) {
               setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
-              trackCreditLimitReached({
-                conversationId: conversationId || "unknown",
-              });
             } else {
               setErrorMessage(event.error);
             }
@@ -473,8 +461,6 @@ export function ConversationWebSocketProvider({
       appendInput,
       appendOutput,
       updateMetricsFromStats,
-      trackCreditLimitReached,
-      posthog,
     ],
   );
 
@@ -515,13 +501,9 @@ export function ConversationWebSocketProvider({
                 eventId: event.id,
                 errorCode: event.code,
               },
-              posthog,
             });
             if (isBudgetOrCreditError(event.detail)) {
               setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
-              trackCreditLimitReached({
-                conversationId: conversationId || "unknown",
-              });
             } else {
               setErrorMessage(event.detail);
             }
@@ -540,14 +522,10 @@ export function ConversationWebSocketProvider({
                 toolName: event.tool_name,
                 toolCallId: event.tool_call_id,
               },
-              posthog,
             });
             // Use friendly i18n message for budget/credit errors instead of raw error
             if (isBudgetOrCreditError(event.error)) {
               setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
-              trackCreditLimitReached({
-                conversationId: conversationId || "unknown",
-              });
             } else {
               setErrorMessage(event.error);
             }
@@ -655,8 +633,6 @@ export function ConversationWebSocketProvider({
       readConversationFile,
       setPlanContent,
       updateMetricsFromStats,
-      trackCreditLimitReached,
-      posthog,
     ],
   );
 

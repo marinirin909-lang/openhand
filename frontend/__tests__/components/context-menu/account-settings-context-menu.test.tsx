@@ -7,22 +7,6 @@ import { renderWithProviders } from "../../../test-utils";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMockWebClientConfig } from "../../helpers/mock-config";
 
-const mockTrackAddTeamMembersButtonClick = vi.fn();
-
-vi.mock("#/hooks/use-tracking", () => ({
-  useTracking: () => ({
-    trackAddTeamMembersButtonClick: mockTrackAddTeamMembersButtonClick,
-  }),
-}));
-
-// Mock posthog feature flag
-vi.mock("posthog-js/react", () => ({
-  useFeatureFlagEnabled: vi.fn(),
-}));
-
-// Import the mocked module to get access to the mock
-import * as posthog from "posthog-js/react";
-
 describe("AccountSettingsContextMenu", () => {
   const user = userEvent.setup();
   const onClickAccountSettingsMock = vi.fn();
@@ -35,8 +19,6 @@ describe("AccountSettingsContextMenu", () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    // Set default feature flag to false
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(false);
   });
 
   // Create a wrapper with MemoryRouter and renderWithProviders
@@ -67,8 +49,6 @@ describe("AccountSettingsContextMenu", () => {
     onClickAccountSettingsMock.mockClear();
     onLogoutMock.mockClear();
     onCloseMock.mockClear();
-    mockTrackAddTeamMembersButtonClick.mockClear();
-    vi.mocked(posthog.useFeatureFlagEnabled).mockClear();
   });
 
   it("should always render the right options", () => {
@@ -140,75 +120,6 @@ describe("AccountSettingsContextMenu", () => {
     await user.click(accountSettingsButton);
     await user.click(document.body);
 
-    expect(onCloseMock).toHaveBeenCalledOnce();
-  });
-
-  it("should show Add Team Members button in SaaS mode when feature flag is enabled", () => {
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(true);
-    renderWithSaasConfig(
-      <AccountSettingsContextMenu
-        onLogout={onLogoutMock}
-        onClose={onCloseMock}
-      />,
-    );
-
-    expect(screen.getByTestId("add-team-members-button")).toBeInTheDocument();
-    expect(screen.getByText("SETTINGS$NAV_ADD_TEAM_MEMBERS")).toBeInTheDocument();
-  });
-
-  it("should not show Add Team Members button in SaaS mode when feature flag is disabled", () => {
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(false);
-    renderWithSaasConfig(
-      <AccountSettingsContextMenu
-        onLogout={onLogoutMock}
-        onClose={onCloseMock}
-      />,
-    );
-
-    expect(screen.queryByTestId("add-team-members-button")).not.toBeInTheDocument();
-    expect(screen.queryByText("SETTINGS$NAV_ADD_TEAM_MEMBERS")).not.toBeInTheDocument();
-  });
-
-  it("should not show Add Team Members button in OSS mode even when feature flag is enabled", () => {
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(true);
-    renderWithOssConfig(
-      <AccountSettingsContextMenu
-        onLogout={onLogoutMock}
-        onClose={onCloseMock}
-      />,
-    );
-
-    expect(screen.queryByTestId("add-team-members-button")).not.toBeInTheDocument();
-    expect(screen.queryByText("SETTINGS$NAV_ADD_TEAM_MEMBERS")).not.toBeInTheDocument();
-  });
-
-  it("should not show Add Team Members button when analytics consent is disabled", () => {
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(true);
-    renderWithSaasConfig(
-      <AccountSettingsContextMenu
-        onLogout={onLogoutMock}
-        onClose={onCloseMock}
-      />,
-      { analyticsConsent: false },
-    );
-
-    expect(screen.queryByTestId("add-team-members-button")).not.toBeInTheDocument();
-    expect(screen.queryByText("SETTINGS$NAV_ADD_TEAM_MEMBERS")).not.toBeInTheDocument();
-  });
-
-  it("should call tracking function and onClose when Add Team Members button is clicked", async () => {
-    vi.mocked(posthog.useFeatureFlagEnabled).mockReturnValue(true);
-    renderWithSaasConfig(
-      <AccountSettingsContextMenu
-        onLogout={onLogoutMock}
-        onClose={onCloseMock}
-      />,
-    );
-
-    const addTeamMembersButton = screen.getByTestId("add-team-members-button");
-    await user.click(addTeamMembersButton);
-
-    expect(mockTrackAddTeamMembersButtonClick).toHaveBeenCalledOnce();
     expect(onCloseMock).toHaveBeenCalledOnce();
   });
 });

@@ -14,6 +14,7 @@ from storage.conversation_work import ConversationWork
 from storage.database import a_session_maker, session_maker
 from storage.stored_conversation_metadata import StoredConversationMetadata
 
+from openhands.analytics import get_analytics_service
 from openhands.core.config import load_openhands_config
 from openhands.core.schema.agent import AgentState
 from openhands.events.event_store import EventStore
@@ -30,6 +31,15 @@ from openhands.utils.async_utils import call_sync_from_async
 
 config = load_openhands_config()
 file_store = get_file_store(config.file_store, config.file_store_path)
+
+# V0 terminal state sets for analytics
+_TERMINAL_ERROR_STATES = {AgentState.ERROR}
+_TERMINAL_FINISHED_STATES = {
+    AgentState.FINISHED,
+    AgentState.STOPPED,
+    AgentState.AWAITING_USER_INPUT,
+}
+_ALL_TERMINAL_STATES = _TERMINAL_ERROR_STATES | _TERMINAL_FINISHED_STATES
 
 
 async def process_event(
@@ -61,6 +71,120 @@ async def process_event(
     if isinstance(event, AgentStateChangedObservation):
         # Load and invoke all active callbacks for this conversation
         await invoke_conversation_callbacks(conversation_id, event)
+
+        # V0 best-effort analytics for terminal states
+        if event.agent_state in _ALL_TERMINAL_STATES:
+            try:
+                analytics = get_analytics_service()
+                if analytics and user_id:
+                    from openhands.analytics import resolve_context
+
+                    ctx = await resolve_context(user_id)
+
+                    # Look up conversation metadata for cost/token data
+                    with session_maker() as meta_session:
+                        conv_meta = (
+                            meta_session.query(StoredConversationMetadata)
+                            .filter(
+                                StoredConversationMetadata.conversation_id
+                                == conversation_id
+                            )
+                            .first()
+                        )
+
+                    if event.agent_state in _TERMINAL_ERROR_STATES:
+                        analytics.track_conversation_errored(
+                            distinct_id=user_id,
+                            conversation_id=conversation_id,
+                            error_type='unknown',  # V0: error classification not available from AgentState alone
+                            error_message=None,
+                            llm_model=conv_meta.llm_model
+                            if conv_meta and hasattr(conv_meta, 'llm_model')
+                            else None,
+                            turn_count=None,
+                            terminal_state=event.agent_state.value
+                            if hasattr(event.agent_state, 'value')
+                            else str(event.agent_state),
+                            org_id=ctx.org_id,
+                            consented=ctx.consented,
+                        )
+                    else:
+                        analytics.track_conversation_finished(
+                            distinct_id=user_id,
+                            conversation_id=conversation_id,
+                            terminal_state=event.agent_state.value
+                            if hasattr(event.agent_state, 'value')
+                            else str(event.agent_state),
+                            turn_count=None,
+                            accumulated_cost_usd=conv_meta.accumulated_cost
+                            if conv_meta
+                            else None,
+                            prompt_tokens=conv_meta.prompt_tokens
+                            if conv_meta
+                            else None,
+                            completion_tokens=conv_meta.completion_tokens
+                            if conv_meta
+                            else None,
+                            llm_model=conv_meta.llm_model
+                            if conv_meta and hasattr(conv_meta, 'llm_model')
+                            else None,
+                            trigger=None,  # V0: trigger not available in callback context
+                            org_id=ctx.org_id,
+                            consented=ctx.consented,
+                        )
+
+                        # ACTV-01: user activated (first finished conversation only)
+                        if event.agent_state == AgentState.FINISHED:
+                            try:
+                                import uuid as _uuid
+                                from datetime import timezone
+
+                                from sqlalchemy import func
+                                from sqlalchemy import select as sa_select
+                                from storage.stored_conversation_metadata_saas import (
+                                    StoredConversationMetadataSaas,
+                                )
+
+                                user_uuid = _uuid.UUID(user_id)
+                                with session_maker() as act_session:
+                                    count_result = act_session.execute(
+                                        sa_select(func.count()).where(
+                                            StoredConversationMetadataSaas.user_id
+                                            == user_uuid,
+                                            StoredConversationMetadataSaas.conversation_id
+                                            != conversation_id,
+                                        )
+                                    )
+                                    prior_count = count_result.scalar()
+
+                                if prior_count == 0:
+                                    tos_ts = ctx.user.accepted_tos if ctx.user else None
+                                    if tos_ts is not None:
+                                        if tos_ts.tzinfo is None:
+                                            tos_ts = tos_ts.replace(tzinfo=timezone.utc)
+                                        from datetime import datetime
+
+                                        time_to_activate_seconds = (
+                                            datetime.now(timezone.utc) - tos_ts
+                                        ).total_seconds()
+                                    else:
+                                        time_to_activate_seconds = None
+
+                                    analytics.track_user_activated(
+                                        distinct_id=user_id,
+                                        conversation_id=conversation_id,
+                                        time_to_activate_seconds=time_to_activate_seconds,
+                                        llm_model=conv_meta.llm_model
+                                        if conv_meta
+                                        else None,
+                                        trigger=None,  # V0: trigger not available in callback context
+                                        org_id=ctx.org_id,
+                                        consented=ctx.consented,
+                                    )
+                            except Exception:
+                                logger.exception('analytics:user_activated:v0:failed')
+            except Exception:
+                logger.exception('analytics:v0_terminal_state:failed')
 
         # Update active working seconds if agent state is not Running
         if event.agent_state != AgentState.RUNNING:

@@ -1,5 +1,4 @@
 import React from "react";
-import { usePostHog } from "posthog-js/react";
 import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { convertImageToBase64 } from "#/utils/convert-image-to-base-64";
@@ -15,7 +14,6 @@ import { useWsClient } from "#/context/ws-client-provider";
 import { Messages as V0Messages } from "./messages";
 import { ChatSuggestions } from "./chat-suggestions";
 import { ScrollProvider } from "#/context/scroll-context";
-import { useInitialQueryStore } from "#/stores/initial-query-store";
 import { useSendMessage } from "#/hooks/use-send-message";
 import { useAgentState } from "#/hooks/use-agent-state";
 import { useHandleBuildPlanClick } from "#/hooks/use-handle-build-plan-click";
@@ -39,17 +37,7 @@ import { useConversationWebSocket } from "#/contexts/conversation-websocket-cont
 import ChatStatusIndicator from "./chat-status-indicator";
 import { getStatusColor, getStatusText } from "#/utils/utils";
 
-function getEntryPoint(
-  hasRepository: boolean | null,
-  hasReplayJson: boolean | null,
-): string {
-  if (hasRepository) return "github";
-  if (hasReplayJson) return "replay";
-  return "direct";
-}
-
 export function ChatInterface() {
-  const posthog = usePostHog();
   const { setMessageToSend } = useConversationStore();
   const { data: conversation } = useActiveConversation();
   const { errorMessage, removeErrorMessage } = useErrorMessageStore();
@@ -118,7 +106,6 @@ export function ChatInterface() {
     "positive" | "negative"
   >("positive");
   const [feedbackModalIsOpen, setFeedbackModalIsOpen] = React.useState(false);
-  const { selectedRepository, replayJson } = useInitialQueryStore();
   const params = useParams();
   const { mutateAsync: uploadFiles } = useUnifiedUploadFiles();
 
@@ -149,22 +136,6 @@ export function ChatInterface() {
     // Create mutable copies of the arrays
     const images = [...originalImages];
     const files = [...originalFiles];
-    if (totalEvents === 0) {
-      posthog.capture("initial_query_submitted", {
-        entry_point: getEntryPoint(
-          selectedRepository !== null,
-          replayJson !== null,
-        ),
-        query_character_length: content.length,
-        replay_json_size: replayJson?.length,
-      });
-    } else {
-      posthog.capture("user_message_sent", {
-        session_message_count: totalEvents,
-        current_message_length: content.length,
-      });
-    }
-
     // Validate file sizes before any processing
     const allFiles = [...images, ...files];
     const validation = validateFiles(allFiles);

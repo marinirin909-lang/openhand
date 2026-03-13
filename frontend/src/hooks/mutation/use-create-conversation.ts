@@ -4,7 +4,6 @@ import V1ConversationService from "#/api/conversation-service/v1-conversation-se
 import { SuggestedTask } from "#/utils/types";
 import { Provider } from "#/types/settings";
 import { CreateMicroagent, Conversation } from "#/api/open-hands.types";
-import { useTracking } from "#/hooks/use-tracking";
 import { useSettings } from "#/hooks/query/use-settings";
 
 interface CreateConversationVariables {
@@ -33,7 +32,6 @@ interface CreateConversationResponse extends Partial<Conversation> {
 
 export const useCreateConversation = () => {
   const queryClient = useQueryClient();
-  const { trackConversationCreated } = useTracking();
   const { data: settings } = useSettings();
 
   return useMutation({
@@ -95,11 +93,7 @@ export const useCreateConversation = () => {
         is_v1: false,
       };
     },
-    onSuccess: async (_, { repository }) => {
-      trackConversationCreated({
-        hasRepository: !!repository,
-      });
-
+    onSuccess: async () => {
       queryClient.removeQueries({
         queryKey: ["user", "conversations"],
       });

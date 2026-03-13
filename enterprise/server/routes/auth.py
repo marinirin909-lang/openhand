@@ -7,7 +7,6 @@ from typing import Annotated, Optional, cast
 from urllib.parse import quote, urlencode
 from uuid import UUID as parse_uuid
 
-import posthog
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import SecretStr
@@ -43,6 +42,7 @@ from storage.database import a_session_maker
 from storage.user import User
 from storage.user_store import UserStore
 
+from openhands.analytics import get_analytics_service
 from openhands.core.logger import openhands_logger as logger
 from openhands.integrations.provider import ProviderHandler
 from openhands.integrations.service_types import ProviderType, TokenResponse
@@ -120,6 +120,35 @@ def _extract_oauth_state(state: str | None) -> tuple[str, str | None, str | None
         return state, None, None
 
 
+async def _get_user_orgs_with_data(user_id: str, org_member_ids: list) -> list:
+    """Load Org objects for a user's org memberships.
+
+    Uses org_member.org_id list to batch-load Org objects, avoiding N+1
+    by loading all orgs a user belongs to in one query via OrgStore.
+
+    Args:
+        user_id: The user's ID string
+        org_member_ids: List of org_id UUIDs from user.org_members
+
+    Returns:
+        List of Org objects the user belongs to
+    """
+    from storage.org_store import OrgStore
+
+    orgs = []
+    for org_id in org_member_ids:
+        try:
+            org = await OrgStore.get_org_by_id(org_id)
+            if org:
+                orgs.append(org)
+        except Exception:
+            logger.exception(
+                'auth:_get_user_orgs_with_data:failed',
+                extra={'user_id': user_id, 'org_id': str(org_id)},
+            )
+    return orgs
+
+
 @oauth_router.get('/keycloak/callback')
 async def keycloak_callback(
     request: Request,
@@ -181,9 +210,11 @@ async def keycloak_callback(
     email = user_info.email
     user_id = user_info.sub
     user_info_dict = user_info.model_dump(exclude_none=True)
+    is_new_user = False
     user = await UserStore.get_user_by_id(user_id)
     if not user:
         user = await UserStore.create_user(user_id, user_info_dict)
+        is_new_user = True
     else:
         # Existing user — gradually backfill contact_name if it still has a username-style value
         await UserStore.backfill_contact_name(user_id, user_info_dict)
@@ -197,6 +228,36 @@ async def keycloak_callback(
         )
 
     logger.info(f'Logging in user {str(user.id)} in org {user.current_org_id}')
+
+    # Analytics: user signed up event (fires only for new users, once per user)
+    if is_new_user:
+        try:
+            analytics = get_analytics_service()
+            if analytics:
+                consented = (
+                    user.user_consents_to_analytics is True
+                )  # None = undecided = not consented
+                org_id_str = str(user.current_org_id) if user.current_org_id else None
+
+                analytics.track_user_signed_up(
+                    distinct_id=user_id,
+                    idp=user_info.get('identity_provider', 'keycloak'),
+                    email_domain=email.split('@')[1]
+                    if email and '@' in email
+                    else None,
+                    invitation_source='invitation'
+                    if invitation_token
+                    else 'self_signup',
+                    org_id=org_id_str,
+                    consented=consented,
+                )
+                analytics.set_person_properties(
+                    distinct_id=user_id,
+                    properties={'signed_up_at': datetime.now(timezone.utc).isoformat()},
+                    consented=consented,
+                )
+        except Exception:
+            logger.exception('analytics:user_signed_up:failed')
 
     # reCAPTCHA verification with Account Defender
     if RECAPTCHA_SITE_KEY:
@@ -314,36 +375,68 @@ async def keycloak_callback(
         f'keycloakAccessToken: {keycloak_access_token}, keycloakUserId: {user_id}'
     )
 
-    # adding in posthog tracking
+    # Server-side identity — full person and org group tracking via AnalyticsService
+    analytics = get_analytics_service()
+    if analytics:
+        consented = (
+            user.user_consents_to_analytics is True
+        )  # None = undecided = not consented
+        org_id_str = str(user.current_org_id) if user.current_org_id else None
 
-    # If this is a feature environment, add "FEATURE_" prefix to user_id for PostHog
-    posthog_user_id = f'FEATURE_{user_id}' if IS_FEATURE_ENV else user_id
+        # Load current org for identify_user
+        from storage.org_store import OrgStore
 
-    try:
-        posthog.set(
-            distinct_id=posthog_user_id,
-            properties={
-                'user_id': posthog_user_id,
-                'original_user_id': user_id,
-                'is_feature_env': IS_FEATURE_ENV,
-            },
+        current_org = (
+            await OrgStore.get_org_by_id(user.current_org_id)
+            if user.current_org_id
+            else None
         )
-    except Exception as e:
-        logger.error(
-            'auth:posthog_set:failed',
-            extra={
-                'user_id': user_id,
-                'error': str(e),
-            },
+
+        # Load org data for identify_user (orgs list with member_count)
+        org_member_ids = (
+            [om.org_id for om in user.org_members] if user.org_members else []
         )
-        # Continue execution as this is not critical
+        user_orgs = await _get_user_orgs_with_data(user_id, org_member_ids)
+
+        from storage.org_member_store import OrgMemberStore
+
+        orgs_data = []
+        for org in user_orgs:
+            try:
+                member_count = await OrgMemberStore.get_org_members_count(org_id=org.id)
+            except Exception:
+                logger.exception(
+                    'auth:identify_user:member_count_failed',
+                    extra={'user_id': user_id, 'org_id': str(org.id)},
+                )
+                member_count = None
+            orgs_data.append(
+                {'id': str(org.id), 'name': org.name, 'member_count': member_count}
+            )
+
+        analytics.identify_user(
+            distinct_id=user_id,
+            consented=consented,
+            email=email,
+            org_id=org_id_str,
+            org_name=current_org.name if current_org else None,
+            idp=idp,
+            orgs=orgs_data,
+        )
+
+        analytics.track_user_logged_in(
+            distinct_id=user_id,
+            idp=idp,
+            org_id=org_id_str,
+            consented=consented,
+        )
 
     logger.info(
         'user_logged_in',
         extra={
             'idp': idp,
             'idp_type': idp_type,
-            'posthog_user_id': posthog_user_id,
+            'user_id': user_id,
             'is_feature_env': IS_FEATURE_ENV,
         },
     )

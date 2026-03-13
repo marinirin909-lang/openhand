@@ -10,6 +10,7 @@ import uuid
 from types import MappingProxyType
 from typing import Any
 
+from openhands.analytics import analytics_constants, get_analytics_service
 from openhands.core.config.mcp_config import MCPConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.events.action.message import MessageAction
@@ -71,6 +72,41 @@ async def initialize_conversation(
         )
 
         await conversation_store.save_metadata(conversation_metadata)
+
+        # Analytics: conversation created (V0 best-effort — llm_model not available at this point)
+        try:
+            analytics = get_analytics_service()
+            if analytics and user_id:
+                from storage.user_store import UserStore
+
+                user_obj = await UserStore.get_user_by_id(user_id)
+                if user_obj:
+                    consented = user_obj.user_consents_to_analytics is True
+                    org_id = (
+                        str(user_obj.current_org_id)
+                        if user_obj.current_org_id
+                        else None
+                    )
+                    analytics.capture(
+                        distinct_id=user_id,
+                        event=analytics_constants.CONVERSATION_CREATED,
+                        properties={
+                            'conversation_id': conversation_id,
+                            'trigger': (
+                                conversation_trigger.value
+                                if conversation_trigger
+                                else None
+                            ),
+                            'llm_model': None,  # V0: llm_model not available at conversation init time
+                            'agent_type': 'default',
+                            'has_repository': selected_repository is not None,
+                        },
+                        org_id=org_id,
+                        consented=consented,
+                    )
+        except Exception:
+            logger.exception('analytics:conversation_created:v0:failed')
+
         return conversation_metadata
 
     conversation_metadata = await conversation_store.get_metadata(conversation_id)

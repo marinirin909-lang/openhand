@@ -1,3 +1,6 @@
+# Planning docs (local only)
+.planning/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

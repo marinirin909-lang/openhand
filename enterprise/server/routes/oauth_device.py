@@ -10,6 +10,7 @@ from server.utils.url_utils import get_web_url
 from storage.api_key_store import ApiKeyStore
 from storage.device_code_store import DeviceCodeStore
 
+from openhands.analytics import get_analytics_service, resolve_context
 from openhands.core.logger import openhands_logger as logger
 from openhands.server.user_auth import get_user_id
 
@@ -311,6 +312,42 @@ async def device_verification_authenticated(
             'Device code authorized with API key successfully',
             extra={'user_code': user_code, 'user_id': user_id},
         )
+
+        # Server-side identity tracking for device auth flow
+        analytics = get_analytics_service()
+        if analytics:
+            try:
+                ctx = await resolve_context(user_id)
+
+                # Load current org name for identify_user
+                from storage.org_store import OrgStore
+
+                current_org = (
+                    await OrgStore.get_org_by_id(ctx.user.current_org_id)
+                    if ctx.user and ctx.user.current_org_id
+                    else None
+                )
+
+                analytics.identify_user(
+                    distinct_id=user_id,
+                    consented=ctx.consented,
+                    org_id=ctx.org_id,
+                    org_name=current_org.name if current_org else None,
+                    idp='device_auth',
+                )
+
+                analytics.track_user_logged_in(
+                    distinct_id=user_id,
+                    idp='device_auth',
+                    org_id=ctx.org_id,
+                    consented=ctx.consented,
+                )
+            except Exception:
+                logger.exception(
+                    'oauth_device:analytics:failed',
+                    extra={'user_id': user_id},
+                )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={'message': 'Device authorized successfully!'},

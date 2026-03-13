@@ -1,6 +1,7 @@
 """Store class for managing users."""
 
 import asyncio
+import os
 import uuid
 from typing import Optional
 from uuid import UUID
@@ -81,6 +82,9 @@ class UserStore:
             )
             user.email = user_info.get('email')
             user.email_verified = user_info.get('email_verified')
+            # SaaS consent is implicit via Terms of Service — new SaaS users default to consented
+            if 'saas' in (os.environ.get('OPENHANDS_CONFIG_CLS', '')).lower():
+                user.user_consents_to_analytics = True
             session.add(user)
 
             role = await RoleStore.get_role_by_name('owner')
