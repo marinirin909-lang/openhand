@@ -462,7 +462,7 @@ class SlackUpdateExistingConversationView(SlackNewConversationView):
             )
 
             # 6. Send the message to the agent server
-            url = f"{agent_server_url.rstrip('/')}/api/conversations/{UUID(self.conversation_id)}/events"
+            url = f'{agent_server_url.rstrip("/")}/api/conversations/{UUID(self.conversation_id)}/events'
 
             headers = {'X-Session-API-Key': running_sandbox.session_api_key}
             payload = send_message_request.model_dump()

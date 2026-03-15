@@ -182,6 +182,10 @@ class SaasSettingsStore(SettingsStore):
                 )
 
             kwargs = item.model_dump(context={'expose_secrets': True})
+            # Filter out timeout field as it's not supported in enterprise
+            if 'timeout' in kwargs:
+                del kwargs['timeout']
+
             for model in (user, org, org_member):
                 for key, value in kwargs.items():
                     if hasattr(model, key):
@@ -237,8 +241,12 @@ class SaasSettingsStore(SettingsStore):
     def _should_encrypt(self, key):
         return key in self.ENCRYPT_VALUES
 
-    def _decrypt_kwargs(self, kwargs: dict):
+    def _decrypt_kwargs(self, kwargs: dict, is_top_level: bool = True):
         fernet = self._fernet()
+        # Filter out timeout field as it's not supported in enterprise (only top-level)
+        if is_top_level and 'timeout' in kwargs:
+            del kwargs['timeout']
+
         for key, value in kwargs.items():
             try:
                 if value is None:
@@ -254,14 +262,19 @@ class SaasSettingsStore(SettingsStore):
             except binascii.Error:
                 pass  # Key is in legacy format...
 
-    def _encrypt_kwargs(self, kwargs: dict):
+    def _encrypt_kwargs(self, kwargs: dict, is_top_level: bool = True):
         fernet = self._fernet()
+        # Filter out timeout field as it's not supported in enterprise (only at top level)
+        if is_top_level and 'timeout' in kwargs:
+            del kwargs['timeout']
+
         for key, value in kwargs.items():
             if value is None:
                 continue
 
             if isinstance(value, dict):
-                self._encrypt_kwargs(value)
+                # For nested dictionaries, don't remove timeout (only top-level)
+                self._encrypt_kwargs(value, is_top_level=False)
                 continue
 
             if self._should_encrypt(key):

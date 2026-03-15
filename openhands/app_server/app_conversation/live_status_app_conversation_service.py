@@ -715,12 +715,27 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
         if model and model.startswith('openhands/'):
             base_url = user.llm_base_url or self.openhands_provider_base_url
 
-        return LLM(
-            model=model,
-            base_url=base_url,
-            api_key=user.llm_api_key,
-            usage_id='agent',
-        )
+        # Get timeout from user settings directly
+        timeout = user.timeout
+
+        # Validate timeout - must be None, 0, or an integer between 1 and 3600 seconds (aligning with SDK)
+        if timeout is not None:
+            if not isinstance(timeout, int) or timeout < 0 or timeout > 3600:
+                # For invalid values, don't pass timeout parameter to let SDK use its default
+                timeout = None
+
+        llm_kwargs: dict[str, str | SecretStr | None | int] = {
+            'model': model,
+            'base_url': base_url,
+            'api_key': user.llm_api_key,
+            'usage_id': 'agent',
+        }
+
+        # Only include timeout if it's explicitly set and valid
+        if timeout is not None:
+            llm_kwargs['timeout'] = timeout
+
+        return LLM(**llm_kwargs)
 
     async def _get_tavily_api_key(self, user: UserInfo) -> str | None:
         """Get Tavily search API key, prioritizing user's key over service key.

@@ -68,7 +68,7 @@ def settings_store(async_session_maker, mock_config):
     # Patch the store method to write to UserSettings table directly (for testing)
     async def patched_store(item):
         if item:
-            # Make a copy of the item without email and email_verified
+            # Make a copy of the item without email, email_verified, secrets_store, and timeout
             item_dict = item.model_dump(context={'expose_secrets': True})
             if 'email' in item_dict:
                 del item_dict['email']
@@ -76,6 +76,8 @@ def settings_store(async_session_maker, mock_config):
                 del item_dict['email_verified']
             if 'secrets_store' in item_dict:
                 del item_dict['secrets_store']
+            if 'timeout' in item_dict:
+                del item_dict['timeout']
 
             # Encrypt the data before storing
             store._encrypt_kwargs(item_dict)
