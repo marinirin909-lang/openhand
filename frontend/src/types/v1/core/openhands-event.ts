@@ -12,6 +12,7 @@ import {
   ConversationStateUpdateEvent,
   ConversationErrorEvent,
   PauseEvent,
+  StreamingTextEvent,
 } from "./events/index";
 
 /**
@@ -33,4 +34,6 @@ export type OpenHandsEvent =
   | ConversationStateUpdateEvent
   | ConversationErrorEvent
   // Control events
-  | PauseEvent;
+  | PauseEvent
+  // Streaming events
+  | StreamingTextEvent;

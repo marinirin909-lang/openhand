@@ -13,6 +13,7 @@ import {
 import { AgentErrorEvent } from "./core/events/observation-event";
 import { MessageEvent } from "./core/events/message-event";
 import { ActionEvent } from "./core/events/action-event";
+import { StreamingTextEvent } from "./core/events/streaming-event";
 import {
   ConversationStateUpdateEvent,
   ConversationStateUpdateEventAgentStatus,
@@ -190,6 +191,22 @@ export const isConversationErrorEvent = (
   event: OpenHandsEvent,
 ): event is ConversationErrorEvent =>
   "kind" in event && event.kind === "ConversationErrorEvent";
+
+/**
+ * Type guard function to check if an event is a streaming text event.
+ * Streaming events contain incremental LLM response content.
+ */
+export const isStreamingTextEvent = (
+  event: OpenHandsEvent,
+): event is StreamingTextEvent =>
+  "kind" in event &&
+  event.kind === "StreamingTextEvent" &&
+  "response_id" in event &&
+  "content" in event &&
+  "is_complete" in event &&
+  typeof event.response_id === "string" &&
+  typeof event.content === "string" &&
+  typeof event.is_complete === "boolean";
 
 // =============================================================================
 // TEMPORARY COMPATIBILITY TYPE GUARDS

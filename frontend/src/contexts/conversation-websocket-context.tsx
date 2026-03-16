@@ -20,6 +20,7 @@ import {
   isV1Event,
   isAgentErrorEvent,
   isUserMessageEvent,
+  isMessageEvent,
   isActionEvent,
   isConversationStateUpdateEvent,
   isFullStateConversationStateUpdateEvent,
@@ -31,7 +32,9 @@ import {
   isPlanningFileEditorObservationEvent,
   isBrowserObservationEvent,
   isBrowserNavigateActionEvent,
+  isStreamingTextEvent,
 } from "#/types/v1/type-guards";
+import { useStreamingStore } from "#/stores/streaming-store";
 import { ConversationStateUpdateEventStats } from "#/types/v1/core/events/conversation-state-event";
 import { handleActionEventCacheInvalidation } from "#/utils/cache-utils";
 import { buildWebSocketUrl } from "#/utils/websocket-url";
@@ -342,6 +345,23 @@ export function ConversationWebSocketProvider({
           }
         }
 
+        // Handle streaming events separately - they don't go to the event store
+        if (isStreamingTextEvent(event)) {
+          const { appendChunk, completeStream } = useStreamingStore.getState();
+
+          if (event.is_complete) {
+            completeStream(event.response_id);
+          } else {
+            appendChunk(
+              event.response_id,
+              event.content,
+              event.reasoning_content,
+            );
+          }
+          // Streaming events are ephemeral - don't add to event store
+          return;
+        }
+
         // Use type guard to validate v1 event structure
         if (isV1Event(event)) {
           addEvent(event);
@@ -397,6 +417,21 @@ export function ConversationWebSocketProvider({
           // Clear optimistic user message when a user message is confirmed
           if (isUserMessageEvent(event)) {
             removeOptimisticUserMessage();
+          }
+
+          // Clear completed streaming messages when assistant message arrives
+          // The MessageEvent replaces the streaming content with the final version
+          if (
+            isMessageEvent(event) &&
+            event.llm_message?.role === "assistant"
+          ) {
+            const { activeStreams, clearStream } = useStreamingStore.getState();
+            // Clear all completed streams
+            activeStreams.forEach((stream, responseId) => {
+              if (stream.isComplete) {
+                clearStream(responseId);
+              }
+            });
           }
 
           // Handle cache invalidation for ActionEvent
@@ -494,6 +529,23 @@ export function ConversationWebSocketProvider({
           ) {
             setIsLoadingHistoryPlanning(false);
           }
+        }
+
+        // Handle streaming events separately - they don't go to the event store
+        if (isStreamingTextEvent(event)) {
+          const { appendChunk, completeStream } = useStreamingStore.getState();
+
+          if (event.is_complete) {
+            completeStream(event.response_id);
+          } else {
+            appendChunk(
+              event.response_id,
+              event.content,
+              event.reasoning_content,
+            );
+          }
+          // Streaming events are ephemeral - don't add to event store
+          return;
         }
 
         // Use type guard to validate v1 event structure
