@@ -6,7 +6,9 @@ import { useGitHubAuthUrl } from "#/hooks/use-github-auth-url";
 import { useEmailVerification } from "#/hooks/use-email-verification";
 import { useInvitation } from "#/hooks/use-invitation";
 import { LoginContent } from "#/components/features/auth/login-content";
+import { EnterpriseBanner } from "#/components/features/auth/enterprise-banner";
 import { EmailVerificationModal } from "#/components/features/waitlist/email-verification-modal";
+import { PROJ_USER_JOURNEY } from "#/utils/feature-flags";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -66,23 +68,33 @@ export default function LoginPage() {
     return null;
   }
 
+  const isSaasMode = config.data?.app_mode === "saas";
+  const showEnterpriseBanner = isSaasMode && PROJ_USER_JOURNEY();
+
   return (
     <>
       <main
         className="min-h-screen flex items-center justify-center bg-base p-4"
         data-testid="login-page"
       >
-        <LoginContent
-          githubAuthUrl={gitHubAuthUrl}
-          appMode={config.data?.app_mode}
-          authUrl={config.data?.auth_url}
-          providersConfigured={config.data?.providers_configured}
-          emailVerified={emailVerified}
-          hasDuplicatedEmail={hasDuplicatedEmail}
-          recaptchaBlocked={recaptchaBlocked}
-          hasInvitation={hasInvitation}
-          buildOAuthStateData={buildOAuthStateData}
-        />
+        <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+          <LoginContent
+            githubAuthUrl={gitHubAuthUrl}
+            appMode={config.data?.app_mode}
+            authUrl={config.data?.auth_url}
+            providersConfigured={config.data?.providers_configured}
+            emailVerified={emailVerified}
+            hasDuplicatedEmail={hasDuplicatedEmail}
+            recaptchaBlocked={recaptchaBlocked}
+            hasInvitation={hasInvitation}
+            buildOAuthStateData={buildOAuthStateData}
+          />
+          {showEnterpriseBanner && (
+            <div className="w-[301.5px] shrink-0">
+              <EnterpriseBanner />
+            </div>
+          )}
+        </div>
       </main>
 
       {emailVerificationModalOpen && (

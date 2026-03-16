@@ -6,6 +6,7 @@ import { createRoutesStub, useSearchParams } from "react-router";
 import LoginPage from "#/routes/login";
 import OptionService from "#/api/option-service/option-service.api";
 import AuthService from "#/api/auth-service/auth-service.api";
+import * as featureFlags from "#/utils/feature-flags";
 
 const { useEmailVerificationMock, resendEmailVerificationMock } = vi.hoisted(
   () => ({
@@ -699,6 +700,137 @@ describe("LoginPage", () => {
       await waitFor(() => {
         expect(screen.getByText("AUTH$INVITATION_PENDING")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Enterprise Banner", () => {
+    it("should display enterprise banner when in SaaS mode and PROJ_USER_JOURNEY feature flag is enabled", async () => {
+      vi.spyOn(featureFlags, "PROJ_USER_JOURNEY").mockReturnValue(true);
+
+      // @ts-expect-error - partial mock for testing
+      vi.spyOn(OptionService, "getConfig").mockResolvedValue({
+        app_mode: "saas",
+        posthog_client_key: "test-posthog-key",
+        providers_configured: ["github"],
+        auth_url: "https://auth.example.com",
+        feature_flags: {
+          enable_billing: false,
+          hide_llm_settings: false,
+          enable_jira: false,
+          enable_jira_dc: false,
+          enable_linear: false,
+          hide_users_page: false,
+          hide_billing_page: false,
+          hide_integrations_page: false,
+        },
+      });
+
+      render(<RouterStub initialEntries={["/login"]} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("enterprise-banner")).toBeInTheDocument();
+      });
+    });
+
+    it("should NOT display enterprise banner when in SaaS mode but PROJ_USER_JOURNEY feature flag is disabled", async () => {
+      vi.spyOn(featureFlags, "PROJ_USER_JOURNEY").mockReturnValue(false);
+
+      // @ts-expect-error - partial mock for testing
+      vi.spyOn(OptionService, "getConfig").mockResolvedValue({
+        app_mode: "saas",
+        posthog_client_key: "test-posthog-key",
+        providers_configured: ["github"],
+        auth_url: "https://auth.example.com",
+        feature_flags: {
+          enable_billing: false,
+          hide_llm_settings: false,
+          enable_jira: false,
+          enable_jira_dc: false,
+          enable_linear: false,
+          hide_users_page: false,
+          hide_billing_page: false,
+          hide_integrations_page: false,
+        },
+      });
+
+      render(<RouterStub initialEntries={["/login"]} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("login-content")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("enterprise-banner")).not.toBeInTheDocument();
+    });
+
+    it("should NOT display enterprise banner when in OSS mode even if PROJ_USER_JOURNEY feature flag is enabled", async () => {
+      vi.spyOn(featureFlags, "PROJ_USER_JOURNEY").mockReturnValue(true);
+
+      // @ts-expect-error - partial mock for testing
+      vi.spyOn(OptionService, "getConfig").mockResolvedValue({
+        app_mode: "oss",
+        posthog_client_key: "test-posthog-key",
+        feature_flags: {
+          enable_billing: false,
+          hide_llm_settings: false,
+          enable_jira: false,
+          enable_jira_dc: false,
+          enable_linear: false,
+          hide_users_page: false,
+          hide_billing_page: false,
+          hide_integrations_page: false,
+        },
+      });
+
+      render(<RouterStub initialEntries={["/login"]} />, {
+        wrapper: createWrapper(),
+      });
+
+      // In OSS mode, user gets redirected, so login page won't be in document
+      await waitFor(
+        () => {
+          expect(screen.queryByTestId("login-page")).not.toBeInTheDocument();
+        },
+        { timeout: 2000 },
+      );
+
+      expect(screen.queryByTestId("enterprise-banner")).not.toBeInTheDocument();
+    });
+
+    it("should NOT display enterprise banner when PROJ_USER_JOURNEY feature flag is not set (defaults to false)", async () => {
+      // Don't mock PROJ_USER_JOURNEY - let it use the default localStorage behavior which returns false
+      vi.spyOn(featureFlags, "PROJ_USER_JOURNEY").mockReturnValue(false);
+
+      // @ts-expect-error - partial mock for testing
+      vi.spyOn(OptionService, "getConfig").mockResolvedValue({
+        app_mode: "saas",
+        posthog_client_key: "test-posthog-key",
+        providers_configured: ["github"],
+        auth_url: "https://auth.example.com",
+        feature_flags: {
+          enable_billing: false,
+          hide_llm_settings: false,
+          enable_jira: false,
+          enable_jira_dc: false,
+          enable_linear: false,
+          hide_users_page: false,
+          hide_billing_page: false,
+          hide_integrations_page: false,
+        },
+      });
+
+      render(<RouterStub initialEntries={["/login"]} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("login-content")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("enterprise-banner")).not.toBeInTheDocument();
     });
   });
 });
