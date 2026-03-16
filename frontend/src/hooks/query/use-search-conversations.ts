@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import ConversationService from "#/api/conversation-service/conversation-service.api";
+import V1ConversationService from "#/api/conversation-service/v1-conversation-service.api";
 
 export const useSearchConversations = (
   selectedRepository?: string,
@@ -15,12 +15,15 @@ export const useSearchConversations = (
       conversationTrigger,
       limit,
     ],
-    queryFn: () =>
-      ConversationService.searchConversations(
+    queryFn: async () => {
+      const result = await V1ConversationService.searchConversations(
+        limit,
+        undefined, // pageId
         selectedRepository,
         conversationTrigger,
-        limit,
-      ),
+      );
+      return result.results;
+    },
     enabled: true, // Always enabled since parameters are optional
     staleTime: cacheDisabled ? 0 : 1000 * 60 * 5, // 5 minutes
     gcTime: cacheDisabled ? 0 : 1000 * 60 * 15, // 15 minutes

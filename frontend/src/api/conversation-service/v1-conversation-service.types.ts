@@ -166,3 +166,9 @@ export interface V1RuntimeConversationInfo {
   status: V1ConversationExecutionStatus;
   stats: V1RuntimeConversationStats;
 }
+
+// V1 app conversation search/list response
+export interface V1AppConversationPage {
+  items: V1AppConversation[];
+  next_page_id: string | null;
+}

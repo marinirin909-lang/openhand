@@ -1,10 +1,17 @@
 import axios from "axios";
 import { openHands } from "../open-hands-axios";
-import { ConversationTrigger, GetVSCodeUrlResponse } from "../open-hands.types";
+import {
+  ConversationTrigger,
+  GetVSCodeUrlResponse,
+  Conversation,
+  ResultSet,
+} from "../open-hands.types";
 import { Provider } from "#/types/settings";
 import { SuggestedTask } from "#/utils/types";
 import { buildHttpBaseUrl } from "#/utils/websocket-url";
 import { buildSessionHeaders } from "#/utils/utils";
+import { ConversationStatus } from "#/types/conversation-status";
+import { RuntimeStatus } from "#/types/runtime-status";
 import type {
   V1SendMessageRequest,
   V1SendMessageResponse,
@@ -12,9 +19,12 @@ import type {
   V1AppConversationStartTask,
   V1AppConversationStartTaskPage,
   V1AppConversation,
+  V1AppConversationPage,
   GetSkillsResponse,
   V1RuntimeConversationInfo,
+  V1ConversationExecutionStatus,
 } from "./v1-conversation-service.types";
+import type { V1SandboxStatus } from "../sandbox-service/sandbox-service.types";
 
 class V1ConversationService {
   /**
@@ -423,6 +433,112 @@ class V1ConversationService {
       headers,
     });
     return data;
+  }
+
+  /**
+   * Convert V1AppConversation to the common Conversation type
+   * used throughout the frontend
+   * @private
+   */
+  private static mapV1ToConversation(v1Conv: V1AppConversation): Conversation {
+    // Map V1SandboxStatus to ConversationStatus
+    const statusMap: Record<V1SandboxStatus, ConversationStatus> = {
+      RUNNING: "RUNNING",
+      STARTING: "STARTING",
+      PAUSED: "STOPPED",
+      STOPPED: "STOPPED",
+      MISSING: "ARCHIVED",
+    };
+
+    const status: ConversationStatus =
+      statusMap[v1Conv.sandbox_status] || "STOPPED";
+
+    // Map execution status to runtime status
+    let runtimeStatus: RuntimeStatus | null = null;
+    if (status === "RUNNING" && v1Conv.execution_status) {
+      const runtimeMap: Record<V1ConversationExecutionStatus, RuntimeStatus> = {
+        RUNNING: "STATUS$READY",
+        AWAITING_USER_INPUT: "STATUS$READY",
+        AWAITING_USER_CONFIRMATION: "STATUS$READY",
+        FINISHED: "STATUS$READY",
+        PAUSED: "STATUS$READY",
+        STOPPED: "STATUS$STOPPED",
+      };
+      runtimeStatus = runtimeMap[v1Conv.execution_status] || "STATUS$READY";
+    }
+
+    return {
+      conversation_id: v1Conv.id,
+      title: v1Conv.title || `Conversation ${v1Conv.id.slice(0, 8)}`,
+      selected_repository: v1Conv.selected_repository,
+      selected_branch: v1Conv.selected_branch,
+      git_provider: v1Conv.git_provider,
+      last_updated_at: v1Conv.updated_at,
+      created_at: v1Conv.created_at,
+      status,
+      runtime_status: runtimeStatus,
+      trigger: v1Conv.trigger ?? undefined,
+      url: v1Conv.conversation_url,
+      session_api_key: v1Conv.session_api_key,
+      pr_number: v1Conv.pr_number,
+      conversation_version: "V1",
+      public: v1Conv.public,
+    };
+  }
+
+  /**
+   * Search for V1 conversations with filtering and pagination
+   * @param limit Maximum number of conversations to return (max 100)
+   * @param pageId Optional page ID for pagination
+   * @param selectedRepository Optional repository filter (applied client-side)
+   * @param conversationTrigger Optional trigger type filter (applied client-side)
+   * @param includeSubConversations Whether to include sub-conversations
+   * @returns ResultSet of conversations matching the filters
+   */
+  static async searchConversations(
+    limit: number = 20,
+    pageId?: string,
+    selectedRepository?: string,
+    conversationTrigger?: string,
+    includeSubConversations: boolean = false,
+  ): Promise<ResultSet<Conversation>> {
+    const params = new URLSearchParams();
+    params.append("limit", Math.min(limit, 100).toString());
+
+    if (pageId) {
+      params.append("page_id", pageId);
+    }
+
+    if (includeSubConversations) {
+      params.append("include_sub_conversations", "true");
+    }
+
+    const { data } = await openHands.get<V1AppConversationPage>(
+      `/api/v1/app-conversations/search?${params.toString()}`,
+    );
+
+    // Apply client-side filtering if needed
+    let filteredItems = data.items;
+
+    if (selectedRepository) {
+      filteredItems = filteredItems.filter(
+        (conv) => conv.selected_repository === selectedRepository,
+      );
+    }
+
+    if (conversationTrigger) {
+      filteredItems = filteredItems.filter(
+        (conv) => conv.trigger === conversationTrigger,
+      );
+    }
+
+    // Map V1 conversations to common Conversation type
+    const results = filteredItems.map((conv) => this.mapV1ToConversation(conv));
+
+    return {
+      results,
+      next_page_id: data.next_page_id,
+    };
   }
 }
 
