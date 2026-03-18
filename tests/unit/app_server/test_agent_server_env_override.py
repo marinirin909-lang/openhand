@@ -184,6 +184,31 @@ class TestGetAgentServerEnv:
             }
             assert result == expected
 
+    def test_llm_vars_forwarded_from_app_env(self):
+        """LLM_* vars from app env are forwarded to agent server when no OH_AGENT_SERVER_ENV."""
+        env_vars = {
+            'LLM_TIMEOUT': '3600',
+            'LLM_MODEL': 'us.anthropic.claude-sonnet-4-5',
+            'OTHER_VAR': 'not_forwarded',
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            result = get_agent_server_env()
+        assert result == {
+            'LLM_TIMEOUT': '3600',
+            'LLM_MODEL': 'us.anthropic.claude-sonnet-4-5',
+        }
+
+    def test_oh_agent_server_env_overrides_llm_var(self):
+        """OH_AGENT_SERVER_ENV overrides LLM_* from app env on conflict."""
+        env_vars = {
+            'LLM_TIMEOUT': '3600',
+            'OH_AGENT_SERVER_ENV': '{"LLM_TIMEOUT": "1200", "DEBUG": "true"}',
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            result = get_agent_server_env()
+        assert result['LLM_TIMEOUT'] == '1200'
+        assert result['DEBUG'] == 'true'
+
 
 class TestDockerSandboxSpecEnvironmentOverride:
     """Test environment variable override integration in Docker sandbox specs."""

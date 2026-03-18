@@ -72,24 +72,22 @@ def get_agent_server_image() -> str:
 def get_agent_server_env() -> dict[str, str]:
     """Get environment variables to be injected into agent server sandbox environments.
 
-    This function reads environment variable overrides from the OH_AGENT_SERVER_ENV
-    environment variable, which should contain a JSON string mapping variable names
-    to their values.
+    Forwards all LLM_* variables from the app process (e.g. LLM_TIMEOUT) so agent-server
+    containers receive the same LLM config. Additional or overriding variables can be
+    set via OH_AGENT_SERVER_ENV (JSON); values in OH_AGENT_SERVER_ENV override LLM_*.
 
     Usage:
-        Set OH_AGENT_SERVER_ENV to a JSON string:
-        OH_AGENT_SERVER_ENV='{"DEBUG": "true", "LOG_LEVEL": "info", "CUSTOM_VAR": "value"}'
-
-        This will inject the following environment variables into all sandbox environments:
-        - DEBUG=true
-        - LOG_LEVEL=info
-        - CUSTOM_VAR=value
+        App env LLM_TIMEOUT=3600 -> agent-server gets LLM_TIMEOUT=3600.
+        OH_AGENT_SERVER_ENV='{"LLM_TIMEOUT": "1200", "DEBUG": "true"}' overrides
+        LLM_TIMEOUT and adds DEBUG.
 
     Returns:
-        dict[str, str]: Dictionary of environment variable names to values.
-                       Returns empty dict if OH_AGENT_SERVER_ENV is not set or invalid.
+        dict[str, str]: Environment variables for agent server (LLM_* from os.environ
+        merged with OH_AGENT_SERVER_ENV; OH_AGENT_SERVER_ENV wins on conflict).
 
     Raises:
-        JSONDecodeError: If OH_AGENT_SERVER_ENV contains invalid JSON.
+        JSONDecodeError: If OH_AGENT_SERVER_ENV is set but contains invalid JSON.
     """
-    return env_parser.from_env(dict[str, str], 'OH_AGENT_SERVER_ENV')
+    llm_vars = {k: v for k, v in os.environ.items() if k.startswith('LLM_')}
+    overrides = env_parser.from_env(dict[str, str], 'OH_AGENT_SERVER_ENV')
+    return {**llm_vars, **overrides}
