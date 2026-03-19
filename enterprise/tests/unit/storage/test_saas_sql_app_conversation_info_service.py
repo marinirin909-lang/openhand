@@ -14,9 +14,7 @@ from server.utils.saas_app_conversation_info_injector import (
     SaasSQLAppConversationInfoService,
 )
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-from storage.base import Base
+from sqlalchemy.ext.asyncio import AsyncSession
 from storage.org import Org
 from storage.user import User
 
@@ -35,41 +33,17 @@ ORG2_ID = UUID('d2222222-2222-2222-2222-222222222222')
 
 
 @pytest.fixture
-async def async_engine():
-    """Create an async SQLite engine for testing."""
-    engine = create_async_engine(
-        'sqlite+aiosqlite:///:memory:',
-        poolclass=StaticPool,
-        connect_args={'check_same_thread': False},
-        echo=False,
-    )
-
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    await engine.dispose()
-
-
-@pytest.fixture
-async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
+async def async_session(async_session_maker) -> AsyncGenerator[AsyncSession, None]:
     """Create an async session for testing."""
-    async_session_maker = async_sessionmaker(
-        async_engine, class_=AsyncSession, expire_on_commit=False
-    )
-
     async with async_session_maker() as db_session:
         yield db_session
 
 
 @pytest.fixture
-async def async_session_with_users(async_engine) -> AsyncGenerator[AsyncSession, None]:
+async def async_session_with_users(
+    async_session_maker,
+) -> AsyncGenerator[AsyncSession, None]:
     """Create an async session with pre-populated Org and User rows for testing."""
-    async_session_maker = async_sessionmaker(
-        async_engine, class_=AsyncSession, expire_on_commit=False
-    )
 
     async with async_session_maker() as db_session:
         # Insert Orgs first (required for User foreign key)

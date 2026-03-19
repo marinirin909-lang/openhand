@@ -69,6 +69,7 @@ opencv-python = "*"
 pandas = "*"
 reportlab = "*"
 gevent = ">=24.2.1,<26.0.0"
+testcontainers = "*"
 
 [tool.poetry-dynamic-versioning]
 enable = true

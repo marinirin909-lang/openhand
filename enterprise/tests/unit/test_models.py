@@ -4,25 +4,10 @@ Test that the models are correctly defined.
 
 from uuid import uuid4
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from storage.base import Base
 from storage.org import Org
 from storage.org_member import OrgMember
+from storage.role import Role
 from storage.user import User
-
-
-@pytest.fixture
-def engine():
-    engine = create_engine('sqlite:///:memory:')
-    Base.metadata.create_all(engine)
-    return engine
-
-
-@pytest.fixture
-def session_maker(engine):
-    return sessionmaker(bind=engine)
 
 
 def test_user_model(session_maker):
@@ -37,6 +22,11 @@ def test_user_model(session_maker):
         test_user_id = uuid4()
         user = User(id=test_user_id, current_org_id=org.id, language='en')
         session.add(user)
+        session.flush()
+
+        # Create role (FK parent for OrgMember)
+        role = Role(id=1, name='admin', rank=1)
+        session.add(role)
         session.flush()
 
         # Create org_member relationship

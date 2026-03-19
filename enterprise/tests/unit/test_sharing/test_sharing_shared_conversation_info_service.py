@@ -11,8 +11,7 @@ from server.sharing.shared_conversation_models import (
 from server.sharing.sql_shared_conversation_info_service import (
     SQLSharedConversationInfoService,
 )
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.ext.asyncio import AsyncSession
 from storage.org import Org
 from storage.stored_conversation_metadata_saas import StoredConversationMetadataSaas
 from storage.user import User
@@ -24,7 +23,6 @@ from openhands.app_server.app_conversation.sql_app_conversation_info_service imp
     SQLAppConversationInfoService,
 )
 from openhands.app_server.user.specifiy_user_context import SpecifyUserContext
-from openhands.app_server.utils.sql_utils import Base
 from openhands.integrations.provider import ProviderType
 from openhands.sdk.llm import MetricsSnapshot
 from openhands.sdk.llm.utils.metrics import TokenUsage
@@ -32,31 +30,8 @@ from openhands.storage.data_models.conversation_metadata import ConversationTrig
 
 
 @pytest.fixture
-async def async_engine():
-    """Create an async SQLite engine for testing."""
-    engine = create_async_engine(
-        'sqlite+aiosqlite:///:memory:',
-        poolclass=StaticPool,
-        connect_args={'check_same_thread': False},
-        echo=False,
-    )
-
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    await engine.dispose()
-
-
-@pytest.fixture
-async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
+async def async_session(async_session_maker) -> AsyncGenerator[AsyncSession, None]:
     """Create an async session for testing."""
-    async_session_maker = async_sessionmaker(
-        async_engine, class_=AsyncSession, expire_on_commit=False
-    )
-
     async with async_session_maker() as db_session:
         yield db_session
 
@@ -441,30 +416,10 @@ class TestSharedConversationInfoServiceWithSaasMetadata:
     """
 
     @pytest.fixture
-    async def async_engine_with_saas(self):
-        """Create an async SQLite engine with all SAAS tables."""
-        engine = create_async_engine(
-            'sqlite+aiosqlite:///:memory:',
-            poolclass=StaticPool,
-            connect_args={'check_same_thread': False},
-            echo=False,
-        )
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        yield engine
-        await engine.dispose()
-
-    @pytest.fixture
     async def async_session_with_saas(
-        self, async_engine_with_saas
+        self, async_session_maker
     ) -> AsyncGenerator[AsyncSession, None]:
         """Create an async session for testing with SAAS tables."""
-        async_session_maker = async_sessionmaker(
-            async_engine_with_saas, class_=AsyncSession, expire_on_commit=False
-        )
-
         async with async_session_maker() as db_session:
             yield db_session
 

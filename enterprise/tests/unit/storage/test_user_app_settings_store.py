@@ -8,33 +8,9 @@ import uuid
 
 import pytest
 from server.routes.user_app_settings_models import UserAppSettingsUpdate
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-from storage.base import Base
 from storage.org import Org
 from storage.user import User
 from storage.user_app_settings_store import UserAppSettingsStore
-
-
-@pytest.fixture
-async def async_engine():
-    """Create an async SQLite engine for testing."""
-    engine = create_async_engine(
-        'sqlite+aiosqlite:///:memory:',
-        poolclass=StaticPool,
-        connect_args={'check_same_thread': False},
-        echo=False,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
-
-
-@pytest.fixture
-async def async_session_maker(async_engine):
-    """Create an async session maker for testing."""
-    return async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.mark.asyncio
