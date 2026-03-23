@@ -12,12 +12,14 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     SecretStr,
+    field_validator,
 )
 
 from openhands.core.config.mcp_config import MCPConfig
 from openhands.integrations.provider import CustomSecret, ProviderToken
 from openhands.integrations.service_types import ProviderType
 from openhands.storage.data_models.settings import Settings
+from openhands.utils.env_var_validation import validate_env_var_name
 
 
 class POSTProviderModel(BaseModel):
@@ -50,6 +52,13 @@ class CustomSecretWithoutValueModel(BaseModel):
 
     name: str
     description: str | None = None
+
+    @field_validator('name')
+    @classmethod
+    def validate_secret_name(cls, v: str) -> str:
+        """Validate that the secret name is valid for use as an environment variable."""
+        validate_env_var_name(v, field_name='secret name')
+        return v
 
 
 class CustomSecretModel(CustomSecretWithoutValueModel):

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from openhands.core.config.openhands_config import OpenHandsConfig
 
 from openhands.core.logger import openhands_logger as logger
+from openhands.utils.env_var_validation import validate_env_var_name
 from openhands.utils.import_utils import get_impl
 
 
@@ -169,10 +170,7 @@ class MCPStdioServerConfig(BaseModel):
                 key = key.strip()
                 if not key:
                     raise ValueError('Environment variable key cannot be empty')
-                if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', key):
-                    raise ValueError(
-                        f"Invalid environment variable name '{key}'. Must start with letter or underscore, contain only alphanumeric characters and underscores"
-                    )
+                validate_env_var_name(key, field_name='environment variable name')
 
                 env[key] = value
             return env

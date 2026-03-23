@@ -495,3 +495,158 @@ async def test_add_multiple_git_providers_with_hosts(test_client, file_secrets_s
             stored_secrets.provider_tokens[ProviderType.GITLAB].host
             == 'gitlab.enterprise.com'
         )
+
+
+# =================================================
+# SECTION: Secret name validation tests
+# =================================================
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_invalid_name_hyphen(test_client, file_secrets_store):
+    """Test that creating a secret with a hyphen in name returns 422."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Try to add a secret with an invalid name (contains hyphen)
+    add_secret_data = {
+        'name': 'MY-INVALID-SECRET',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 422  # Validation error
+    assert 'MY-INVALID-SECRET' in response.text or 'Invalid' in response.text
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_invalid_name_starts_with_digit(
+    test_client, file_secrets_store
+):
+    """Test that creating a secret with a name starting with digit returns 422."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Try to add a secret with an invalid name (starts with digit)
+    add_secret_data = {
+        'name': '1_INVALID_SECRET',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_invalid_name_space(test_client, file_secrets_store):
+    """Test that creating a secret with a space in name returns 422."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Try to add a secret with an invalid name (contains space)
+    add_secret_data = {
+        'name': 'MY INVALID SECRET',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_valid_name_underscore(
+    test_client, file_secrets_store
+):
+    """Test that creating a secret with underscores is allowed."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Add a secret with a valid name (underscores allowed)
+    add_secret_data = {
+        'name': 'MY_VALID_SECRET',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 201  # Created successfully
+
+    # Verify it was stored
+    stored_secrets = await file_secrets_store.load()
+    assert 'MY_VALID_SECRET' in stored_secrets.custom_secrets
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_valid_name_starts_with_underscore(
+    test_client, file_secrets_store
+):
+    """Test that creating a secret starting with underscore is allowed."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Add a secret with a valid name (starts with underscore)
+    add_secret_data = {
+        'name': '_PRIVATE_SECRET',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 201  # Created successfully
+
+    # Verify it was stored
+    stored_secrets = await file_secrets_store.load()
+    assert '_PRIVATE_SECRET' in stored_secrets.custom_secrets
+
+
+@pytest.mark.asyncio
+async def test_update_secret_with_invalid_name(test_client, file_secrets_store):
+    """Test that updating a secret with an invalid new name returns 422."""
+    # Create initial secret
+    custom_secrets = {'VALID_SECRET': CustomSecret(secret=SecretStr('old-value'))}
+    user_secrets = Secrets(custom_secrets=custom_secrets)
+    await file_secrets_store.store(user_secrets)
+
+    # Try to update with an invalid new name
+    update_secret_data = {
+        'name': 'INVALID-NEW-NAME',
+        'description': 'Updated description',
+    }
+    response = test_client.put('/api/secrets/VALID_SECRET', json=update_secret_data)
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_update_secret_with_valid_name(test_client, file_secrets_store):
+    """Test that updating a secret with a valid new name succeeds."""
+    # Create initial secret
+    custom_secrets = {'OLD_NAME': CustomSecret(secret=SecretStr('secret-value'))}
+    user_secrets = Secrets(custom_secrets=custom_secrets)
+    await file_secrets_store.store(user_secrets)
+
+    # Update with a valid new name
+    update_secret_data = {
+        'name': 'NEW_VALID_NAME',
+        'description': 'Updated description',
+    }
+    response = test_client.put('/api/secrets/OLD_NAME', json=update_secret_data)
+    assert response.status_code == 200
+
+    # Verify the rename
+    stored_secrets = await file_secrets_store.load()
+    assert 'OLD_NAME' not in stored_secrets.custom_secrets
+    assert 'NEW_VALID_NAME' in stored_secrets.custom_secrets
+
+
+@pytest.mark.asyncio
+async def test_create_secret_with_empty_name(test_client, file_secrets_store):
+    """Test that creating a secret with an empty name returns 422."""
+    user_secrets = Secrets()
+    await file_secrets_store.store(user_secrets)
+
+    # Try to add a secret with an empty name
+    add_secret_data = {
+        'name': '',
+        'value': 'secret-value',
+        'description': None,
+    }
+    response = test_client.post('/api/secrets', json=add_secret_data)
+    assert response.status_code == 422  # Validation error
