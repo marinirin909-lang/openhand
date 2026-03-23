@@ -1,16 +1,20 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
+import { useUserProviders } from "#/hooks/use-user-providers";
 import { getRandomTip } from "#/utils/tips";
 
 export function RandomTip() {
   const { t } = useTranslation();
-  const [randomTip, setRandomTip] = React.useState(getRandomTip());
+  const { providers } = useUserProviders();
+  const [randomTip, setRandomTip] = React.useState(() =>
+    getRandomTip(providers),
+  );
 
-  // Update the random tip when the component mounts
+  // Update the random tip when the component mounts or providers change
   React.useEffect(() => {
-    setRandomTip(getRandomTip());
-  }, []);
+    setRandomTip(getRandomTip(providers));
+  }, [providers]);
 
   return (
     <div>

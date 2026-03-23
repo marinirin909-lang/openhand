@@ -11984,6 +11984,22 @@
     "uk": "OpenHands Cloud пропонує хук GitHub, тож ви можете сказати «@openhands виправити конфлікти злиття» або «@openhands виправити відгук про цей PR» прямо в інтерфейсі GitHub.",
     "ca": "OpenHands Cloud ofereix un hook de GitHub, de manera que podeu dir \"@openhands corregeix els conflictes de fusió\" o \"@openhands corregeix els comentaris d'aquesta PR\" directament dins de la interfície de GitHub."
   },
+  "TIPS$GITLAB_HOOK": {
+    "en": "OpenHands Cloud offers a GitLab integration, so you can say \"@openhands fix the merge conflicts\" or \"@openhands fix the feedback on this MR\" right inside the GitLab UI.",
+    "ja": "OpenHands CloudはGitLab統合を提供しているため、GitLab UI内で「@openhands マージの競合を修正して」や「@openhands このMRのフィードバックを修正して」と言うことができます。",
+    "zh-CN": "OpenHands Cloud提供GitLab集成，因此您可以在GitLab UI中直接说\"@openhands 修复合并冲突\"或\"@openhands 修复此MR上的反馈\"。",
+    "zh-TW": "OpenHands Cloud提供GitLab整合，因此您可以在GitLab UI中直接說\"@openhands 修復合併衝突\"或\"@openhands 修復此MR上的反饋\"。",
+    "ko-KR": "OpenHands Cloud는 GitLab 통합을 제공하므로 GitLab UI 내에서 \"@openhands 병합 충돌 수정\" 또는 \"@openhands 이 MR의 피드백 수정\"이라고 말할 수 있습니다.",
+    "no": "OpenHands Cloud tilbyr en GitLab-integrasjon, så du kan si \"@openhands fix the merge conflicts\" eller \"@openhands fix the feedback on this MR\" direkte i GitLab-grensesnittet.",
+    "it": "OpenHands Cloud offre un'integrazione GitLab, così puoi dire \"@openhands fix the merge conflicts\" o \"@openhands fix the feedback on this MR\" direttamente nell'interfaccia di GitLab.",
+    "pt": "O OpenHands Cloud oferece uma integração GitLab, para que você possa dizer \"@openhands fix the merge conflicts\" ou \"@openhands fix the feedback on this MR\" diretamente na interface do GitLab.",
+    "es": "OpenHands Cloud ofrece una integración con GitLab, por lo que puede decir \"@openhands fix the merge conflicts\" o \"@openhands fix the feedback on this MR\" directamente en la interfaz de GitLab.",
+    "ar": "يوفر OpenHands Cloud تكاملاً مع GitLab، لذلك يمكنك قول \"@openhands أصلح تعارضات الدمج\" أو \"@openhands أصلح التعليقات على طلب الدمج هذا\" مباشرة داخل واجهة GitLab.",
+    "fr": "OpenHands Cloud propose une intégration GitLab, vous pouvez donc dire \"@openhands fix the merge conflicts\" ou \"@openhands fix the feedback on this MR\" directement dans l'interface GitLab.",
+    "tr": "OpenHands Cloud, GitLab entegrasyonu sunar, böylece GitLab arayüzünde doğrudan \"@openhands birleştirme çakışmalarını düzelt\" veya \"@openhands bu MR'daki geri bildirimi düzelt\" diyebilirsiniz.",
+    "de": "OpenHands Cloud bietet eine GitLab-Integration, sodass Sie \"@openhands fix the merge conflicts\" oder \"@openhands fix the feedback on this MR\" direkt in der GitLab-Benutzeroberfläche sagen können.",
+    "uk": "OpenHands Cloud пропонує інтеграцію з GitLab, тож ви можете сказати «@openhands виправити конфлікти злиття» або «@openhands виправити відгук про цей MR» прямо в інтерфейсі GitLab."
+  },
   "TIPS$BLOG_SIGNUP": {
     "en": "Sign up for the OpenHands Blog to hear about new features and the latest releases.",
     "ja": "OpenHandsブログに登録して、新機能や最新リリースについての情報を入手しましょう。",
