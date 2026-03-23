@@ -216,13 +216,15 @@ RUN \
     apt-get install -y --no-install-recommends \
         libnss3 libnspr4 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libxcomposite1 \
         libxdamage1 libxrandr2 libgbm1 libxss1 && \
-    # Install libasound2 - try new package name first (Ubuntu 24.04+), fallback to old name
+    # Install libasound2 and libcups2 - try new package names first (Ubuntu 24.04+), fallback to old names
     (apt-get install -y --no-install-recommends libasound2t64 || apt-get install -y --no-install-recommends libasound2) && \
+    (apt-get install -y --no-install-recommends libcups2t64 || apt-get install -y --no-install-recommends libcups2) && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    # Install Playwright browsers in shared location accessible to all users
+    # Install Playwright Chromium browser in shared location accessible to all users
+    # Note: system deps are already installed above, so we don't use --with-deps
     export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers && \
     mkdir -p /opt/playwright-browsers && \
-    /openhands/micromamba/bin/micromamba run -n openhands poetry run playwright install --with-deps chromium && \
+    /openhands/micromamba/bin/micromamba run -n openhands poetry run playwright install chromium && \
     # Set proper permissions for shared access
     chmod -R 755 /opt/playwright-browsers && \
     # Create cache directories and symlinks for both users
@@ -345,9 +347,11 @@ RUN \
     mkdir -p /home/openhands && \
     mkdir -p /openhands && \
     mkdir -p $(dirname ${OPENVSCODE_SERVER_ROOT}) && \
-    # Ensure ownership is correct for all OpenHands paths
-    chown -R openhands:openhands /home/openhands || true && \
-    chown -R openhands:openhands /openhands || true
+    # Ensure ownership is correct for base directories (non-recursive for performance)
+    # Recursive chown is avoided as files should already have correct ownership from
+    # build_from_scratch or versioned base image. COPY --chown handles new files.
+    chown openhands:openhands /home/openhands || true && \
+    chown openhands:openhands /openhands || true
 
 {{ setup_vscode_server() }}
 
