@@ -10,11 +10,12 @@ description = "OpenHands: Code Less, Make More"
 readme = "README.md"
 license = "MIT"
 authors = [ { name = "OpenHands", email = "contact@all-hands.dev" } ]
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 # Version is managed dynamically by poetry-dynamic-versioning
 dynamic = [ "version" ]
@@ -162,7 +163,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12,<3.14"
+python = "^3.12,<3.15"
 authlib = ">=1.6.9"                                # CVE-2026-27962 (fixed in 1.6.9)
 orjson = ">=3.11.6"                                # Pinned to fix CVE-2025-67221
 litellm = ">=1.74.3, !=1.64.4, !=1.67.*"           # avoid 1.64.4 (known bug) & 1.67.* (known bug #10272)
