@@ -3,7 +3,6 @@ import { usePostHog } from "posthog-js/react";
 import { useNavigate } from "react-router";
 import { openHands } from "#/api/open-hands-axios";
 import { handleCaptureConsent } from "#/utils/handle-capture-consent";
-import { useTracking } from "#/hooks/use-tracking";
 
 interface AcceptTosVariables {
   redirectUrl: string;
@@ -16,7 +15,6 @@ interface AcceptTosResponse {
 export const useAcceptTos = () => {
   const posthog = usePostHog();
   const navigate = useNavigate();
-  const { trackUserSignupCompleted } = useTracking();
 
   return useMutation({
     mutationFn: async ({ redirectUrl }: AcceptTosVariables) => {
@@ -29,8 +27,8 @@ export const useAcceptTos = () => {
       });
     },
     onSuccess: (response, { redirectUrl }) => {
-      // Track user signup completion
-      trackUserSignupCompleted();
+      // Defer signup event until after posthog.identify() runs post-redirect
+      sessionStorage.setItem("oh_signup_pending", new Date().toISOString());
 
       // Get the redirect URL from the response
       const finalRedirectUrl = response.data.redirect_url || redirectUrl;

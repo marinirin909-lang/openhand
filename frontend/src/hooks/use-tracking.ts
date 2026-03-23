@@ -67,13 +67,6 @@ export const useTracking = () => {
     });
   };
 
-  const trackUserSignupCompleted = () => {
-    posthog.capture("user_signup_completed", {
-      signup_timestamp: new Date().toISOString(),
-      ...commonProperties,
-    });
-  };
-
   const trackCreditsPurchased = ({
     amountUsd,
     stripeSessionId,
@@ -136,7 +129,6 @@ export const useTracking = () => {
     trackPullButtonClick,
     trackCreatePrButtonClick,
     trackGitProviderConnected,
-    trackUserSignupCompleted,
     trackCreditsPurchased,
     trackCreditLimitReached,
     trackAddTeamMembersButtonClick,

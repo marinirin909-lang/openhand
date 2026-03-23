@@ -30,7 +30,6 @@ vi.mock("#/hooks/use-tracking", () => ({
     trackPullButtonClick: vi.fn(),
     trackCreatePrButtonClick: vi.fn(),
     trackGitProviderConnected: vi.fn(),
-    trackUserSignupCompleted: vi.fn(),
     trackCreditsPurchased: vi.fn(),
   }),
 }));

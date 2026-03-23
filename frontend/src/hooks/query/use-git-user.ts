@@ -32,6 +32,17 @@ export const useGitUser = () => {
         user: user.data.login,
         mode: config?.app_mode || "oss",
       });
+
+      const signupTimestamp = sessionStorage.getItem("oh_signup_pending");
+      if (signupTimestamp) {
+        posthog.capture("user_signup_completed", {
+          signup_timestamp: signupTimestamp,
+          app_surface: config?.app_mode || "saas",
+          user_email: user.data.email,
+          user_name: user.data.login,
+        });
+  }, [user.data, config, posthog]);
+      }
     }
   }, [user.data]);
 
