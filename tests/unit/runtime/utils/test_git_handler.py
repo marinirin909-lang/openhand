@@ -254,6 +254,33 @@ class TestGitHandler(unittest.TestCase):
         }
         assert diff == expected_diff
 
+    def test_get_git_diff_committed_delete(self):
+        """Test that get_git_diff handles committed deleted files."""
+        diff = self.git_handler.get_git_diff('committed_delete.txt')
+        expected_diff = {
+            'original': 'committed_delete.txt\nLine 1\nLine 2\nLine 3',
+            'modified': '',
+        }
+        assert diff == expected_diff
+
+    def test_get_git_diff_staged_delete(self):
+        """Test that get_git_diff handles staged deleted files."""
+        diff = self.git_handler.get_git_diff('staged_delete.txt')
+        expected_diff = {
+            'original': 'staged_delete.txt\nLine 1\nLine 2\nLine 3',
+            'modified': '',
+        }
+        assert diff == expected_diff
+
+    def test_get_git_diff_unstaged_delete(self):
+        """Test that get_git_diff handles unstaged deleted files."""
+        diff = self.git_handler.get_git_diff('unstaged_delete.txt')
+        expected_diff = {
+            'original': 'unstaged_delete.txt\nLine 1\nLine 2\nLine 3',
+            'modified': '',
+        }
+        assert diff == expected_diff
+
     def test_get_git_changes_fallback(self):
         """Test that get_git_changes falls back to creating a script file when needed."""
         # Break the git changes command
@@ -300,9 +327,10 @@ class TestGitHandler(unittest.TestCase):
         # A payload that would create the sentinel file if injection were possible
         malicious_path = f'"; touch {sentinel}; echo "'
 
-        # get_git_diff should raise (no such file) rather than executing the payload
-        with self.assertRaises(ValueError):
-            self.git_handler.get_git_diff(malicious_path)
+        # get_git_diff should safely handle the malicious path without executing it
+        # For non-existent files (like malicious paths), it returns empty content
+        # The important check is that no shell injection occurs
+        self.git_handler.get_git_diff(malicious_path)
 
         assert not os.path.exists(sentinel), (
             'Shell injection succeeded: sentinel file was created'
@@ -349,9 +377,15 @@ class TestGitShowCmdBuilder:
 
 def test_get_git_diff_file_too_large():
     """Raises ValueError('file_to_large') when the file exceeds the size limit."""
-    with patch('os.path.getsize', return_value=git_diff.MAX_FILE_SIZE_FOR_GIT_DIFF + 1):
-        with pytest.raises(ValueError, match='file_to_large'):
-            git_diff.get_git_diff('/nonexistent/path.txt')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Create an actual file so that path.exists() returns True
+        file_path = os.path.join(tmp_dir, 'large_file.txt')
+        Path(file_path).write_text('content')
+        with patch(
+            'os.path.getsize', return_value=git_diff.MAX_FILE_SIZE_FOR_GIT_DIFF + 1
+        ):
+            with pytest.raises(ValueError, match='file_to_large'):
+                git_diff.get_git_diff(file_path)
 
 
 def test_get_git_diff_no_repository():

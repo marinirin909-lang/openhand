@@ -89,7 +89,9 @@ def _make_git_show_cmd(ref: str, repo_relative_path: str) -> str:
 
 def get_git_diff(relative_file_path: str) -> dict[str, str]:
     path = Path(os.getcwd(), relative_file_path).resolve()
-    if os.path.getsize(path) > MAX_FILE_SIZE_FOR_GIT_DIFF:
+    file_exists = path.exists()
+    # Only check file size if the file exists (deleted files won't exist)
+    if file_exists and os.path.getsize(path) > MAX_FILE_SIZE_FOR_GIT_DIFF:
         raise ValueError('file_to_large')
     closest_git_repo = get_closest_git_repo(path)
     if not closest_git_repo:
