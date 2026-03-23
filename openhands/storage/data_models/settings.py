@@ -64,6 +64,8 @@ class Settings(BaseModel):
     max_budget_per_task: float | None = None
     # Maximum number of events in the conversation view before condensation runs
     condenser_max_size: int | None = None
+    # Maximum number of tokens in the conversation before condensation runs
+    condenser_max_tokens: int | None = None
     email: str | None = None
     email_verified: bool | None = None
     git_user_name: str | None = None
@@ -140,6 +142,15 @@ class Settings(BaseModel):
             return v
         if v < 20:
             raise ValueError('condenser_max_size must be at least 20')
+        return v
+
+    @field_validator('condenser_max_tokens')
+    @classmethod
+    def validate_condenser_max_tokens(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        if v < 1:
+            raise ValueError('condenser_max_tokens must be at least 1')
         return v
 
     @field_serializer('secrets_store')

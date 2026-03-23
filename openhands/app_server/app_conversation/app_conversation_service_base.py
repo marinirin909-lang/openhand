@@ -440,19 +440,21 @@ class AppConversationServiceBase(AppConversationService, ABC):
         llm: LLM,
         agent_type: AgentType,
         condenser_max_size: int | None,
+        condenser_max_tokens: int | None = None,
     ) -> LLMSummarizingCondenser:
         """Create a condenser based on user settings and agent type.
 
         Args:
             llm: The LLM instance to use for condensation
             agent_type: Type of agent (PLAN or DEFAULT)
-            condenser_max_size: condenser_max_size setting
+            condenser_max_size: condenser_max_size setting (event-based trigger)
+            condenser_max_tokens: condenser_max_tokens setting (token-based trigger)
 
         Returns:
             Configured LLMSummarizingCondenser instance
         """
         # LLMSummarizingCondenser SDK defaults: max_size=240, keep_first=2
-        condenser_kwargs = {
+        condenser_kwargs: dict = {
             'llm': llm.model_copy(
                 update={
                     'usage_id': (
@@ -466,6 +468,10 @@ class AppConversationServiceBase(AppConversationService, ABC):
         # Only override max_size if user has a custom value
         if condenser_max_size is not None:
             condenser_kwargs['max_size'] = condenser_max_size
+
+        # Only override max_tokens if user has a custom value
+        if condenser_max_tokens is not None:
+            condenser_kwargs['max_tokens'] = condenser_max_tokens
 
         condenser = LLMSummarizingCondenser(**condenser_kwargs)
 

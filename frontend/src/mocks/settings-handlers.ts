@@ -49,6 +49,7 @@ export const MOCK_DEFAULT_USER_SETTINGS: Settings = {
   provider_tokens_set: {},
   enable_default_condenser: DEFAULT_SETTINGS.enable_default_condenser,
   condenser_max_size: DEFAULT_SETTINGS.condenser_max_size,
+  condenser_max_tokens: DEFAULT_SETTINGS.condenser_max_tokens,
   enable_sound_notifications: DEFAULT_SETTINGS.enable_sound_notifications,
   enable_proactive_conversation_starters:
     DEFAULT_SETTINGS.enable_proactive_conversation_starters,

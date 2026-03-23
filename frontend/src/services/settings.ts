@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   provider_tokens_set: {},
   enable_default_condenser: true,
   condenser_max_size: 240,
+  condenser_max_tokens: null,
   enable_sound_notifications: false,
   user_consents_to_analytics: false,
   enable_proactive_conversation_starters: false,

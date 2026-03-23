@@ -17,6 +17,8 @@ const saveSettingsMutationFn = async (settings: Partial<Settings>) => {
         : settings.llm_api_key?.trim() || undefined,
     condenser_max_size:
       settings.condenser_max_size ?? DEFAULT_SETTINGS.condenser_max_size,
+    condenser_max_tokens:
+      settings.condenser_max_tokens ?? DEFAULT_SETTINGS.condenser_max_tokens,
     search_api_key: settings.search_api_key?.trim() || "",
     git_user_name:
       settings.git_user_name?.trim() || DEFAULT_SETTINGS.git_user_name,

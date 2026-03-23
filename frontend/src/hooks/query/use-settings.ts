@@ -14,6 +14,8 @@ const getSettingsQueryFn = async (): Promise<Settings> => {
     ...settings,
     condenser_max_size:
       settings.condenser_max_size ?? DEFAULT_SETTINGS.condenser_max_size,
+    condenser_max_tokens:
+      settings.condenser_max_tokens ?? DEFAULT_SETTINGS.condenser_max_tokens,
     search_api_key: settings.search_api_key || "",
     email: settings.email || "",
     git_user_name: settings.git_user_name || DEFAULT_SETTINGS.git_user_name,

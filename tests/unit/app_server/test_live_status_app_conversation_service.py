@@ -115,6 +115,7 @@ class TestLiveStatusAppConversationService:
         self.mock_user.confirmation_mode = False
         self.mock_user.search_api_key = None  # Default to None
         self.mock_user.condenser_max_size = None  # Default to None
+        self.mock_user.condenser_max_tokens = None  # Default to None
         self.mock_user.llm_base_url = 'https://api.openai.com/v1'
         self.mock_user.mcp_config = None  # Default to None to avoid error handling path
 
@@ -845,6 +846,7 @@ class TestLiveStatusAppConversationService:
                 system_message_suffix,
                 mcp_config,
                 self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
                 git_provider=git_provider,
                 working_dir=working_dir,
             )
@@ -865,7 +867,10 @@ class TestLiveStatusAppConversationService:
             assert call_kwargs['security_analyzer'] is None
             assert call_kwargs['condenser'] == mock_condenser
             mock_create_condenser.assert_called_once_with(
-                mock_llm, AgentType.PLAN, self.mock_user.condenser_max_size
+                mock_llm,
+                AgentType.PLAN,
+                self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
     @patch(
@@ -900,6 +905,7 @@ class TestLiveStatusAppConversationService:
                 None,
                 mcp_config,
                 self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
             # Assert
@@ -911,7 +917,10 @@ class TestLiveStatusAppConversationService:
             assert call_kwargs['condenser'] == mock_condenser
             mock_get_tools.assert_called_once_with(enable_browser=True)
             mock_create_condenser.assert_called_once_with(
-                mock_llm, AgentType.DEFAULT, self.mock_user.condenser_max_size
+                mock_llm,
+                AgentType.DEFAULT,
+                self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
     @patch(
@@ -950,6 +959,7 @@ class TestLiveStatusAppConversationService:
                 None,  # No existing suffix
                 mcp_config,
                 self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
             # Assert - verify model_copy was called with agent_context containing planning instruction
@@ -994,6 +1004,7 @@ class TestLiveStatusAppConversationService:
                 existing_suffix,
                 mcp_config,
                 self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
             # Assert - verify planning instruction is prepended to existing suffix
@@ -1036,6 +1047,7 @@ class TestLiveStatusAppConversationService:
                 None,
                 mcp_config,
                 self.mock_user.condenser_max_size,
+                self.mock_user.condenser_max_tokens,
             )
 
             # Assert - verify no planning instruction for default agent
@@ -1223,6 +1235,7 @@ class TestLiveStatusAppConversationService:
             'Test suffix',
             mock_mcp_config,
             self.mock_user.condenser_max_size,
+            condenser_max_tokens=self.mock_user.condenser_max_tokens,
             secrets=mock_secrets,
             git_provider=ProviderType.GITHUB,
             working_dir='/test/dir/repo',
@@ -2371,6 +2384,7 @@ class TestPluginHandling:
         self.mock_user.confirmation_mode = False
         self.mock_user.search_api_key = None
         self.mock_user.condenser_max_size = None
+        self.mock_user.condenser_max_tokens = None
         self.mock_user.mcp_config = None
         self.mock_user.security_analyzer = None
 

@@ -1018,6 +1018,7 @@ class UserStore:
             enable_solvability_analysis=org.enable_solvability_analysis,
             v1_enabled=org.v1_enabled,
             condenser_max_size=org.condenser_max_size,
+            condenser_max_tokens=org.condenser_max_tokens,
             already_migrated=False,
         )
 

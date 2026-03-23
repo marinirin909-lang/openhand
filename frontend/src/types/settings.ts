@@ -65,6 +65,8 @@ export type Settings = {
   enable_default_condenser: boolean;
   // Maximum number of events before the condenser runs
   condenser_max_size: number | null;
+  // Maximum number of tokens before the condenser runs
+  condenser_max_tokens: number | null;
   enable_sound_notifications: boolean;
   enable_proactive_conversation_starters: boolean;
   enable_solvability_analysis: boolean;

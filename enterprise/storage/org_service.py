@@ -486,6 +486,7 @@ class OrgService:
             'confirmation_mode',
             'enable_default_condenser',
             'condenser_max_size',
+            'condenser_max_tokens',
         }
 
     @staticmethod

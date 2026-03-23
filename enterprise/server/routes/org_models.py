@@ -257,6 +257,7 @@ class OrgUpdate(BaseModel):
     confirmation_mode: bool | None = None
     enable_default_condenser: bool | None = None
     condenser_max_size: int | None = Field(default=None, ge=20)
+    condenser_max_tokens: int | None = Field(default=None, ge=1)
 
 
 class OrgLLMSettingsResponse(BaseModel):
@@ -270,6 +271,7 @@ class OrgLLMSettingsResponse(BaseModel):
     security_analyzer: str | None = None
     enable_default_condenser: bool = True
     condenser_max_size: int | None = None
+    condenser_max_tokens: int | None = None
     default_max_iterations: int | None = None
 
     @staticmethod
@@ -298,6 +300,7 @@ class OrgLLMSettingsResponse(BaseModel):
             if org.enable_default_condenser is not None
             else True,
             condenser_max_size=org.condenser_max_size,
+            condenser_max_tokens=org.condenser_max_tokens,
             default_max_iterations=org.default_max_iterations,
         )
 
@@ -332,6 +335,7 @@ class OrgLLMSettingsUpdate(BaseModel):
     security_analyzer: str | None = None
     enable_default_condenser: bool | None = None
     condenser_max_size: int | None = Field(default=None, ge=20)
+    condenser_max_tokens: int | None = Field(default=None, ge=1)
     default_max_iterations: int | None = Field(default=None, gt=0)
     llm_api_key: str | None = None
 
