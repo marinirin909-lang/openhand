@@ -56,5 +56,10 @@ export function useSettingsNavItems(): SettingsNavItem[] {
     items = items.filter((item) => item.to !== "/settings/org-members");
   }
 
+  // Hide usage page for users without view_billing permission
+  if (!hasPermission("view_billing") || !organizationId) {
+    items = items.filter((item) => item.to !== "/settings/usage");
+  }
+
   return items;
 }

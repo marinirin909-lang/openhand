@@ -1,4 +1,4 @@
-import { FiUsers, FiBriefcase } from "react-icons/fi";
+import { FiUsers, FiBriefcase, FiBarChart2 } from "react-icons/fi";
 import CreditCardIcon from "#/icons/credit-card.svg?react";
 import KeyIcon from "#/icons/key.svg?react";
 import ServerProcessIcon from "#/icons/server-process.svg?react";
@@ -63,6 +63,11 @@ export const SAAS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/org",
     text: "Organization",
     icon: <FiBriefcase size={22} />,
+  },
+  {
+    to: "/settings/usage",
+    text: "SETTINGS$NAV_USAGE",
+    icon: <FiBarChart2 size={22} />,
   },
 ];
 
