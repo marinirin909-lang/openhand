@@ -365,7 +365,7 @@ export function ConversationWebSocketProvider({
               posthog,
             });
             if (isBudgetOrCreditError(event.detail)) {
-              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
+              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS, true);
               trackCreditLimitReached({
                 conversationId: conversationId || "unknown",
               });
@@ -373,8 +373,11 @@ export function ConversationWebSocketProvider({
               setErrorMessage(event.detail);
             }
           } else {
-            // Clear error message on any non-ConversationErrorEvent
-            removeErrorMessage();
+            // Clear error messages on any non-ConversationErrorEvent
+            // Force clear for ActionEvents since they indicate the agent is actively working
+            // (e.g., after credits are added and agent responds successfully)
+            const shouldForceClear = isActionEvent(event);
+            removeErrorMessage(shouldForceClear);
           }
 
           // Track credit limit reached if AgentErrorEvent has budget-related error
@@ -391,7 +394,7 @@ export function ConversationWebSocketProvider({
             });
             // Use friendly i18n message for budget/credit errors instead of raw error
             if (isBudgetOrCreditError(event.error)) {
-              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
+              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS, true);
               trackCreditLimitReached({
                 conversationId: conversationId || "unknown",
               });
@@ -528,7 +531,7 @@ export function ConversationWebSocketProvider({
               posthog,
             });
             if (isBudgetOrCreditError(event.detail)) {
-              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
+              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS, true);
               trackCreditLimitReached({
                 conversationId: conversationId || "unknown",
               });
@@ -536,8 +539,11 @@ export function ConversationWebSocketProvider({
               setErrorMessage(event.detail);
             }
           } else {
-            // Clear error message on any non-ConversationErrorEvent
-            removeErrorMessage();
+            // Clear error messages on any non-ConversationErrorEvent
+            // Force clear for ActionEvents since they indicate the agent is actively working
+            // (e.g., after credits are added and agent responds successfully)
+            const shouldForceClear = isActionEvent(event);
+            removeErrorMessage(shouldForceClear);
           }
 
           // Handle AgentErrorEvent specifically
@@ -554,7 +560,7 @@ export function ConversationWebSocketProvider({
             });
             // Use friendly i18n message for budget/credit errors instead of raw error
             if (isBudgetOrCreditError(event.error)) {
-              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS);
+              setErrorMessage(I18nKey.STATUS$ERROR_LLM_OUT_OF_CREDITS, true);
               trackCreditLimitReached({
                 conversationId: conversationId || "unknown",
               });

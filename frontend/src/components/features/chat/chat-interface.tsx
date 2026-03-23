@@ -361,7 +361,7 @@ export function ChatInterface() {
           {errorMessage && (
             <ErrorMessageBanner
               message={errorMessage}
-              onDismiss={removeErrorMessage}
+              onDismiss={() => removeErrorMessage(true)}
             />
           )}
 
