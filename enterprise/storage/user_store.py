@@ -25,6 +25,7 @@ from storage.encrypt_utils import (
 from storage.org import Org
 from storage.org_member import OrgMember
 from storage.role_store import RoleStore
+from storage.settings_projection import build_user_settings
 from storage.user import User
 from storage.user_settings import UserSettings
 from utils.identity import resolve_display_name
@@ -935,90 +936,13 @@ class UserStore:
     def _create_user_settings_from_entities(
         user_id: str, org_member: OrgMember, user: User, org: Org
     ) -> UserSettings:
-        """Create UserSettings from OrgMember, User, and Org data.
+        """Create UserSettings from enterprise entities via scope-free payloads."""
 
-        Uses OrgMember values first. If an OrgMember field is None and there's
-        a corresponding "default_" field in Org, use the Org value.
-        Also pulls relevant fields from User.
-
-        Args:
-            user_id: The Keycloak user ID
-            org_member: The OrgMember entity
-            user: The User entity
-            org: The Org entity
-
-        Returns:
-            A new UserSettings object populated from the entities
-        """
-        # Mapping from OrgMember fields to corresponding Org "default_" fields
-        org_member_to_org_default = {
-            'llm_model': 'default_llm_model',
-            'llm_base_url': 'default_llm_base_url',
-            'max_iterations': 'default_max_iterations',
-        }
-
-        def get_value_with_org_fallback(field_name: str, org_member_value):
-            """Get value from OrgMember, falling back to Org default if None."""
-            if org_member_value is not None:
-                return org_member_value
-            org_default_field = org_member_to_org_default.get(field_name)
-            if org_default_field and hasattr(org, org_default_field):
-                return getattr(org, org_default_field)
-            return None
-
-        # Get values from OrgMember with Org fallback for fields with default_ prefix
-        llm_model = get_value_with_org_fallback('llm_model', org_member.llm_model)
-        llm_base_url = get_value_with_org_fallback(
-            'llm_base_url', org_member.llm_base_url
-        )
-        max_iterations = get_value_with_org_fallback(
-            'max_iterations', org_member.max_iterations
-        )
-
-        return UserSettings(
-            keycloak_user_id=user_id,
-            # OrgMember fields
-            llm_api_key=org_member.llm_api_key.get_secret_value()
-            if org_member.llm_api_key
-            else None,
-            llm_api_key_for_byor=org_member.llm_api_key_for_byor.get_secret_value()
-            if org_member.llm_api_key_for_byor
-            else None,
-            llm_model=llm_model,
-            llm_base_url=llm_base_url,
-            max_iterations=max_iterations,
-            # User fields
-            accepted_tos=user.accepted_tos,
-            enable_sound_notifications=user.enable_sound_notifications,
-            language=user.language,
-            user_consents_to_analytics=user.user_consents_to_analytics,
-            email=user.email,
-            email_verified=user.email_verified,
-            git_user_name=user.git_user_name,
-            git_user_email=user.git_user_email,
-            # Org fields
-            agent=org.agent,
-            security_analyzer=org.security_analyzer,
-            confirmation_mode=org.confirmation_mode,
-            remote_runtime_resource_factor=org.remote_runtime_resource_factor,
-            enable_default_condenser=org.enable_default_condenser,
-            billing_margin=org.billing_margin,
-            enable_proactive_conversation_starters=org.enable_proactive_conversation_starters,
-            sandbox_base_container_image=org.sandbox_base_container_image,
-            sandbox_runtime_container_image=org.sandbox_runtime_container_image,
-            user_version=org.org_version,
-            mcp_config=org.mcp_config,
-            search_api_key=org.search_api_key.get_secret_value()
-            if org.search_api_key
-            else None,
-            sandbox_api_key=org.sandbox_api_key.get_secret_value()
-            if org.sandbox_api_key
-            else None,
-            max_budget_per_task=org.max_budget_per_task,
-            enable_solvability_analysis=org.enable_solvability_analysis,
-            v1_enabled=org.v1_enabled,
-            condenser_max_size=org.condenser_max_size,
-            already_migrated=False,
+        return build_user_settings(
+            user_id=user_id,
+            user=user,
+            org=org,
+            org_member=org_member,
         )
 
     @staticmethod

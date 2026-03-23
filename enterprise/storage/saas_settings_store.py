@@ -19,12 +19,13 @@ from storage.lite_llm_manager import LiteLlmManager, get_openhands_cloud_key_ali
 from storage.org import Org
 from storage.org_member import OrgMember
 from storage.org_store import OrgStore
+from storage.settings_projection import build_resolved_settings
 from storage.user import User
 from storage.user_settings import UserSettings
 from storage.user_store import UserStore
 
 from openhands.core.config.openhands_config import OpenHandsConfig
-from openhands.server.settings import Settings
+from openhands.storage.data_models.settings import Settings
 from openhands.storage.settings.settings_store import SettingsStore
 from openhands.utils.llm import is_openhands_model
 
@@ -89,40 +90,7 @@ class SaasSettingsStore(SettingsStore):
                 f'Org not found for ID {org_id} as the current org for user {self.user_id}'
             )
             return None
-        kwargs = {
-            **{
-                normalized: getattr(org, c.name)
-                for c in Org.__table__.columns
-                if (
-                    normalized := c.name.removeprefix('_default_')
-                    .removeprefix('default_')
-                    .lstrip('_')
-                )
-                in Settings.model_fields
-            },
-            **{
-                normalized: getattr(user, c.name)
-                for c in User.__table__.columns
-                if (normalized := c.name.lstrip('_')) in Settings.model_fields
-            },
-        }
-        kwargs['llm_api_key'] = org_member.llm_api_key
-        if org_member.max_iterations:
-            kwargs['max_iterations'] = org_member.max_iterations
-        if org_member.llm_model:
-            kwargs['llm_model'] = org_member.llm_model
-        if org_member.llm_api_key_for_byor:
-            kwargs['llm_api_key_for_byor'] = org_member.llm_api_key_for_byor
-        if org_member.llm_base_url:
-            kwargs['llm_base_url'] = org_member.llm_base_url
-        if org.v1_enabled is None:
-            kwargs['v1_enabled'] = True
-        # Apply default if sandbox_grouping_strategy is None in the database
-        if kwargs.get('sandbox_grouping_strategy') is None:
-            kwargs.pop('sandbox_grouping_strategy', None)
-
-        settings = Settings(**kwargs)
-        return settings
+        return build_resolved_settings(user=user, org=org, org_member=org_member)
 
     async def store(self, item: Settings):
         async with a_session_maker() as session:

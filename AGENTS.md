@@ -301,6 +301,7 @@ There are two main patterns for saving settings in the OpenHands frontend:
   - Uses dedicated mutation hooks for each operation (e.g., `use-add-mcp-server.ts`, `use-delete-mcp-server.ts`)
   - Each mutation triggers immediate API call with query invalidation for UI updates
   - Example: MCP settings, API Keys & Secrets tabs
+
 - Benefits: Simpler UX, no risk of losing changes, consistent with modern web app patterns
 
 **Pattern 2: Form-based Settings (Manual Save)**
@@ -316,6 +317,12 @@ There are two main patterns for saving settings in the OpenHands frontend:
 **When to use each pattern:**
 - Use Pattern 1 (Immediate Save) for entity management where each item is independent
 - Use Pattern 2 (Manual Save) for configuration forms where settings are interdependent or need validation
+
+## Settings Separation Groundwork
+- Shared, scope-free settings payloads now live in `openhands/storage/data_models/settings_groups.py`.
+- `LLMProfile` is intentionally decoupled from `user_id` / `org_id` / `scope` and includes adapters to and from the SDK `openhands.sdk.llm.LLM` type.
+- Enterprise currently projects `User`, `Org`, and `OrgMember` ORM entities into these payloads via `enterprise/storage/settings_projection.py`, then flattens them back into the app-server `Settings` model for the V1 execution path.
+
 
 ### Adding New LLM Models
 

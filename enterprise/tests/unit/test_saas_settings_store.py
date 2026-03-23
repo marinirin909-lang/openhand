@@ -5,8 +5,7 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.core.config.openhands_config import OpenHandsConfig
-from openhands.server.settings import Settings
-from openhands.storage.data_models.settings import Settings as DataSettings
+from openhands.storage.data_models.settings import Settings, SandboxGroupingStrategy
 
 # Mock the database module before importing
 with patch('storage.database.a_session_maker'):
@@ -24,6 +23,78 @@ def mock_config():
     config.file_store = 'google_cloud'
     config.file_store_path = 'bucket'
     return config
+
+
+@pytest.mark.asyncio
+async def test_load_resolves_v1_settings_from_scope_free_groups(mock_config):
+    store = SaasSettingsStore('5594c7b6-f959-4b81-92e9-b09c206f5081', mock_config)
+    org_id = uuid.UUID('5594c7b6-f959-4b81-92e9-b09c206f5082')
+
+    org_member = MagicMock()
+    org_member.org_id = org_id
+    org_member.llm_api_key = SecretStr('member-api-key')
+    org_member.llm_api_key_for_byor = None
+    org_member.llm_model = None
+    org_member.llm_base_url = 'https://member.example.com'
+    org_member.max_iterations = 12
+
+    user = MagicMock()
+    user.current_org_id = org_id
+    user.org_members = [org_member]
+    user.language = 'fr'
+    user.enable_sound_notifications = False
+    user.user_consents_to_analytics = True
+    user.accepted_tos = None
+    user.email = 'user@example.com'
+    user.email_verified = True
+    user.git_user_name = 'openhands'
+    user.git_user_email = 'openhands@example.com'
+    user.sandbox_grouping_strategy = None
+
+    org = MagicMock()
+    org.default_llm_model = 'anthropic/claude-sonnet-4-5-20250929'
+    org.default_llm_base_url = 'https://org.example.com'
+    org.default_max_iterations = 50
+    org.agent = 'CodeActAgent'
+    org.security_analyzer = 'static'
+    org.confirmation_mode = False
+    org.enable_default_condenser = True
+    org.condenser_max_size = 256
+    org.mcp_config = None
+    org.search_api_key = SecretStr('search-key')
+    org.sandbox_api_key = None
+    org.remote_runtime_resource_factor = 2
+    org.enable_proactive_conversation_starters = False
+    org.sandbox_base_container_image = 'base:latest'
+    org.sandbox_runtime_container_image = 'runtime:latest'
+    org.max_budget_per_task = 5.0
+    org.enable_solvability_analysis = True
+    org.v1_enabled = None
+    org.sandbox_grouping_strategy = None
+
+    with (
+        patch(
+            'storage.saas_settings_store.UserStore.get_user_by_id',
+            new=AsyncMock(return_value=user),
+        ),
+        patch(
+            'storage.saas_settings_store.OrgStore.get_org_by_id_async',
+            new=AsyncMock(return_value=org),
+        ),
+    ):
+        settings = await store.load()
+
+    assert settings is not None
+    assert settings.llm_model == 'anthropic/claude-sonnet-4-5-20250929'
+    assert settings.llm_base_url == 'https://member.example.com'
+    assert settings.max_iterations == 12
+    assert settings.llm_api_key is not None
+    assert settings.llm_api_key.get_secret_value() == 'member-api-key'
+    assert settings.language == 'fr'
+    assert settings.email == 'user@example.com'
+    assert settings.v1_enabled is True
+    assert settings.sandbox_grouping_strategy == SandboxGroupingStrategy.NO_GROUPING
+
 
 
 @pytest.fixture
@@ -191,7 +262,7 @@ async def test_ensure_api_key_keeps_valid_key(mock_config):
     """When the existing key is valid, it should be kept unchanged."""
     store = SaasSettingsStore('test-user-id-123', mock_config)
     existing_key = 'sk-existing-key'
-    item = DataSettings(
+    item = Settings(
         llm_model='openhands/gpt-4', llm_api_key=SecretStr(existing_key)
     )
 
@@ -214,7 +285,7 @@ async def test_ensure_api_key_generates_new_key_when_verification_fails(
     """When verification fails, a new key should be generated."""
     store = SaasSettingsStore('test-user-id-123', mock_config)
     new_key = 'sk-new-key'
-    item = DataSettings(
+    item = Settings(
         llm_model='openhands/gpt-4', llm_api_key=SecretStr('sk-invalid-key')
     )
 
@@ -356,7 +427,7 @@ async def test_store_propagates_llm_settings_to_all_org_members(
 
     store = SaasSettingsStore(admin_user_id, mock_config)
 
-    new_settings = DataSettings(
+    new_settings = Settings(
         llm_model='new-shared-model/gpt-4',
         llm_base_url='http://new-shared-url.com',
         max_iterations=100,
@@ -417,7 +488,7 @@ async def test_store_updates_org_default_llm_settings(
 
     store = SaasSettingsStore(admin_user_id, mock_config)
 
-    new_settings = DataSettings(
+    new_settings = Settings(
         llm_model='anthropic/claude-sonnet-4',
         llm_base_url='https://api.anthropic.com/v1',
         max_iterations=75,
