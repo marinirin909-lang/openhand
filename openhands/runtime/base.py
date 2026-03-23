@@ -14,6 +14,7 @@ import random
 import shlex
 import shutil
 import string
+import sys
 import tempfile
 import time
 from abc import abstractmethod
@@ -318,8 +319,61 @@ class Runtime(FileEditRuntimeMixin):
             return obs.content
         return str(obs)
 
+    def _run_env_cmd_redacted(
+        self,
+        cmd: str,
+        context: str,
+        var_names: list[str],
+        is_windows: bool = False,
+    ) -> CmdOutputObservation:
+        """Run a command that may contain secrets, redacting them from any errors.
+
+        This wrapper ensures that if the command fails, secret values are not
+        exposed in error messages. Only variable names are included in errors.
+
+        Args:
+            cmd: The command to execute (may contain secret values)
+            context: Description of what operation is being performed
+            var_names: List of environment variable names being set
+            is_windows: Whether this is a Windows environment (affects error message)
+
+        Returns:
+            CmdOutputObservation on success
+
+        Raises:
+            RuntimeError: With redacted message on failure (no secret values)
+        """
+        try:
+            return self._run_cmd_with_retry(
+                cmd, f'Failed to {context} for env vars {var_names}'
+            )
+        except RuntimeError:
+            # Log the original error at debug level for operators, but redact secret values
+            # We only log the variable names, not the command which contains secrets
+            logger.debug(
+                f'Environment variable command failed for vars {var_names}: '
+                f'exit_code and error details redacted to protect secrets'
+            )
+
+            # Build appropriate error message based on platform
+            if is_windows:
+                hint = 'Check that all variable names are valid PowerShell identifiers.'
+            else:
+                hint = (
+                    'Check that all variable names are valid bash identifiers '
+                    '(alphanumeric and underscores only, cannot start with a digit).'
+                )
+
+            raise RuntimeError(
+                f'Failed to {context} for env vars {var_names}. {hint}'
+            ) from None
+
     def add_env_vars(self, env_vars: dict[str, str]) -> None:
+        if not env_vars:
+            return
+
         env_vars = {key.upper(): value for key, value in env_vars.items()}
+        var_names = list(env_vars.keys())
 
         # Add env vars to the IPython shell (if Jupyter is used)
         if any(isinstance(plugin, JupyterRequirement) for plugin in self.plugins):
@@ -328,13 +382,18 @@ class Runtime(FileEditRuntimeMixin):
                 # Note: json.dumps gives us nice escaping for free
                 code += f'os.environ["{key}"] = {json.dumps(value)}\n'
             code += '\n'
-            self.run_ipython(IPythonRunCellAction(code))
-            # Note: we don't log the vars values, they're leaking info
-            logger.debug('Added env vars to IPython')
-
-        # Check if we're on Windows
-        import os
-        import sys
+            obs = self.run_ipython(IPythonRunCellAction(code))
+            # Check for errors in IPython output - the observation content may contain secrets
+            if isinstance(obs, ErrorObservation):
+                logger.debug(
+                    f'IPython env var setup failed for vars {var_names}: '
+                    'error details redacted to protect secrets'
+                )
+                raise RuntimeError(
+                    f'Failed to add env vars {var_names} to IPython environment. '
+                    'Check that all variable names are valid Python identifiers.'
+                )
+            logger.debug(f'Added env vars to IPython: {var_names}')
 
         is_windows = os.name == 'nt' or sys.platform == 'win32'
 
@@ -346,19 +405,16 @@ class Runtime(FileEditRuntimeMixin):
                 # Note: json.dumps gives us nice escaping for free
                 cmd += f'$env:{key} = {json.dumps(value)}; '
 
-            if not cmd:
-                return
-
             cmd = cmd.strip()
-            logger.debug('Adding env vars to PowerShell')  # don't log the values
+            logger.debug(f'Adding env vars to PowerShell: {var_names}')
 
-            self._run_cmd_with_retry(
-                cmd, f'Failed to add env vars [{env_vars.keys()}] to environment'
+            self._run_env_cmd_redacted(
+                cmd, 'set environment variables', var_names, is_windows=True
             )
 
             # We don't add to profile persistence on Windows as it's more complex
             # and varies between PowerShell versions
-            logger.debug(f'Added env vars to PowerShell session: {env_vars.keys()}')
+            logger.debug(f'Added env vars to PowerShell session: {var_names}')
 
         else:
             # Original bash implementation for Unix systems
@@ -370,21 +426,22 @@ class Runtime(FileEditRuntimeMixin):
                 # Add to .bashrc if not already present
                 bashrc_cmd += f'touch ~/.bashrc; grep -q "^export {key}=" ~/.bashrc || echo "export {key}={json.dumps(value)}" >> ~/.bashrc; '
 
-            if not cmd:
-                return
-
             cmd = cmd.strip()
-            logger.debug('Adding env vars to bash')  # don't log the values
+            logger.debug(f'Adding env vars to bash: {var_names}')
 
-            self._run_cmd_with_retry(
-                cmd, f'Failed to add env vars [{env_vars.keys()}] to environment'
+            self._run_env_cmd_redacted(
+                cmd, 'set environment variables', var_names, is_windows=False
             )
 
             # Add to .bashrc for persistence
             bashrc_cmd = bashrc_cmd.strip()
-            logger.debug(f'Adding env var to .bashrc: {env_vars.keys()}')
-            self._run_cmd_with_retry(
-                bashrc_cmd, f'Failed to add env vars [{env_vars.keys()}] to .bashrc'
+            logger.debug(f'Adding env vars to .bashrc: {var_names}')
+
+            self._run_env_cmd_redacted(
+                bashrc_cmd,
+                'persist environment variables to .bashrc',
+                var_names,
+                is_windows=False,
             )
 
     def on_event(self, event: Event) -> None:
