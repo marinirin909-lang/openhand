@@ -168,6 +168,7 @@ class SetAuthCookieMiddleware:
             '/oauth/device/authorize',
             '/oauth/device/token',
             '/api/v1/web-client/config',
+            '/api/forms/submit',
         )
         if path in ignore_paths:
             return False

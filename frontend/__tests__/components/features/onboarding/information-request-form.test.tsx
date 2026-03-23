@@ -17,6 +17,18 @@ vi.mock("#/hooks/use-tracking", () => ({
   }),
 }));
 
+// Mock useSubmitEnterpriseLead - simulates successful mutation by calling onSuccess
+const mockMutate = vi.fn((data, options) => {
+  // Simulate successful API call by invoking onSuccess callback
+  options?.onSuccess?.();
+});
+vi.mock("#/hooks/mutation/use-submit-enterprise-lead", () => ({
+  useSubmitEnterpriseLead: () => ({
+    mutate: mockMutate,
+    isPending: false,
+  }),
+}));
+
 // Wrapper to manage form state (needed since component is controlled)
 function StatefulForm({ requestType, onBack }: { requestType: RequestType; onBack: () => void }) {
   const [formData, setFormData] = useState<FormData>({ name: "", company: "", email: "", message: "" });
@@ -31,6 +43,10 @@ describe("InformationRequestForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mockMutate to call onSuccess by default
+    mockMutate.mockImplementation((data, options) => {
+      options?.onSuccess?.();
+    });
   });
 
   const renderWithRouter = (props = defaultProps) => {

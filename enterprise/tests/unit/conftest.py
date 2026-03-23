@@ -23,6 +23,7 @@ from storage.billing_session import BillingSession
 from storage.conversation_work import ConversationWork
 from storage.device_code import DeviceCode  # noqa: F401
 from storage.feedback import Feedback
+from storage.form_submission import FormSubmission  # noqa: F401
 from storage.github_app_installation import GithubAppInstallation
 from storage.org import Org
 from storage.org_invitation import OrgInvitation  # noqa: F401

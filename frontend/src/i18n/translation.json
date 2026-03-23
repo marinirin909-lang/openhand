@@ -20745,6 +20745,23 @@
     "tr": "Gönderiliyor...",
     "uk": "Надсилається..."
   },
+  "ENTERPRISE$FORM_SUBMIT_ERROR": {
+    "en": "Failed to submit form. Please try again.",
+    "ja": "フォームの送信に失敗しました。再度お試しください。",
+    "zh-CN": "提交表单失败。请重试。",
+    "zh-TW": "提交表單失敗。請重試。",
+    "ko-KR": "양식 제출에 실패했습니다. 다시 시도해 주세요.",
+    "no": "Kunne ikke sende skjema. Vennligst prøv igjen.",
+    "ar": "فشل إرسال النموذج. يرجى المحاولة مرة أخرى.",
+    "de": "Formular konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+    "fr": "Échec de l'envoi du formulaire. Veuillez réessayer.",
+    "it": "Impossibile inviare il modulo. Riprova.",
+    "pt": "Falha ao enviar formulário. Por favor, tente novamente.",
+    "es": "Error al enviar el formulario. Por favor, inténtelo de nuevo.",
+    "ca": "No s'ha pogut enviar el formulari. Si us plau, torneu-ho a provar.",
+    "tr": "Form gönderilemedi. Lütfen tekrar deneyin.",
+    "uk": "Не вдалося надіслати форму. Будь ласка, спробуйте ще раз."
+  },
   "ENTERPRISE$REQUEST_SUBMITTED_TITLE": {
     "en": "Request submitted",
     "ja": "リクエストが送信されました",

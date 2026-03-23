@@ -21,6 +21,14 @@ vi.mock("#/hooks/use-tracking", () => ({
   }),
 }));
 
+// Mock useSubmitEnterpriseLead
+vi.mock("#/hooks/mutation/use-submit-enterprise-lead", () => ({
+  useSubmitEnterpriseLead: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 describe("InformationRequest", () => {
   beforeEach(() => {
     vi.clearAllMocks();

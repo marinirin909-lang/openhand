@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { I18nKey } from "#/i18n/declaration";
 import { useTracking } from "#/hooks/use-tracking";
+import { useSubmitEnterpriseLead } from "#/hooks/mutation/use-submit-enterprise-lead";
 import { Card } from "#/ui/card";
 import { Text } from "#/ui/typography";
 import { isValidEmail } from "#/utils/input-validation";
+import { displayErrorToast } from "#/utils/custom-toast-handlers";
 import { FormInput } from "./form-input";
 import OpenHandsLogoWhite from "#/assets/branding/openhands-logo-white.svg?react";
 import CloudIcon from "#/icons/cloud-minimal.svg?react";
@@ -36,8 +38,10 @@ export function InformationRequestForm({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { trackEnterpriseLeadFormSubmitted } = useTracking();
+  const submitEnterpriseLead = useSubmitEnterpriseLead();
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isSubmitting = submitEnterpriseLead.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,20 +60,28 @@ export function InformationRequestForm({
       return;
     }
 
-    setIsSubmitting(true);
-
-    // TODO: Implement actual form submission API call
-    // Track form submission in PostHog
-    trackEnterpriseLeadFormSubmitted({
+    const submissionData = {
       requestType,
       name: formData.name.trim(),
       company: formData.company.trim(),
       email: formData.email.trim(),
       message: formData.message.trim(),
-    });
+    };
 
-    // Navigate to login page with state to show confirmation modal
-    navigate("/login", { state: { showRequestSubmittedModal: true } });
+    // Submit to backend API
+    submitEnterpriseLead.mutate(submissionData, {
+      onSuccess: () => {
+        // Track form submission in PostHog (alongside API call)
+        trackEnterpriseLeadFormSubmitted(submissionData);
+
+        // Navigate to login page with state to show confirmation modal
+        navigate("/login", { state: { showRequestSubmittedModal: true } });
+      },
+      onError: () => {
+        // Show error toast to user - do not pretend submission succeeded
+        displayErrorToast(t(I18nKey.ENTERPRISE$FORM_SUBMIT_ERROR));
+      },
+    });
   };
 
   const isSaas = requestType === "saas";

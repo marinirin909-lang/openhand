@@ -31,6 +31,7 @@ from server.routes.billing import billing_router  # noqa: E402
 from server.routes.email import api_router as email_router  # noqa: E402
 from server.routes.event_webhook import event_webhook_router  # noqa: E402
 from server.routes.feedback import router as feedback_router  # noqa: E402
+from server.routes.form_submission import router as form_submission_router  # noqa: E402
 from server.routes.github_proxy import add_github_proxy_routes  # noqa: E402
 from server.routes.integration.jira import jira_integration_router  # noqa: E402
 from server.routes.integration.jira_dc import jira_dc_integration_router  # noqa: E402
@@ -141,6 +142,7 @@ if BITBUCKET_DATA_CENTER_HOST:
     base_app.include_router(bitbucket_dc_proxy_router)
 base_app.include_router(email_router)  # Add routes for email management
 base_app.include_router(feedback_router)  # Add routes for conversation feedback
+base_app.include_router(form_submission_router)  # Add routes for form submissions
 base_app.include_router(
     event_webhook_router
 )  # Add routes for Events in nested runtimes
