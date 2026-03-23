@@ -232,6 +232,17 @@ def config_from_env() -> AppServerConfig:
                 api_key=os.environ['SANDBOX_API_KEY'],
                 api_url=os.environ['SANDBOX_REMOTE_RUNTIME_API_URL'],
             )
+        elif os.getenv('RUNTIME') == 'opensandbox':
+            from openhands.app_server.sandbox.opensandbox_service import (
+                OpenSandboxServiceInjector,
+            )
+
+            config.sandbox = OpenSandboxServiceInjector(
+                api_key=os.environ['OPEN_SANDBOX_API_KEY'],
+                api_url=os.environ.get(
+                    'OPEN_SANDBOX_API_URL', 'http://localhost:8080/v1'
+                ),
+            )
         elif os.getenv('RUNTIME') in ('local', 'process'):
             config.sandbox = ProcessSandboxServiceInjector()
         else:
@@ -284,6 +295,12 @@ def config_from_env() -> AppServerConfig:
     if config.sandbox_spec is None:
         if os.getenv('RUNTIME') == 'remote':
             config.sandbox_spec = RemoteSandboxSpecServiceInjector()
+        elif os.getenv('RUNTIME') == 'opensandbox':
+            from openhands.app_server.sandbox.opensandbox_spec_service import (
+                OpenSandboxSpecServiceInjector,
+            )
+
+            config.sandbox_spec = OpenSandboxSpecServiceInjector()
         elif os.getenv('RUNTIME') in ('local', 'process'):
             config.sandbox_spec = ProcessSandboxSpecServiceInjector()
         else:
