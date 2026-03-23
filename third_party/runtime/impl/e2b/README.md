@@ -1,35 +1,31 @@
-# How to use E2B
+# E2B Runtime (Legacy V0)
 
-[E2B](https://e2b.dev) is an [open-source](https://github.com/e2b-dev/e2b) secure cloud environment (sandbox) made for running AI-generated code and agents. E2B offers [Python](https://pypi.org/project/e2b/) and [JS/TS](https://www.npmjs.com/package/e2b) SDK to spawn and control these sandboxes.
+> **⚠️ DEPRECATED**: This is the legacy V0 E2B runtime implementation.
+> For the new V1 implementation, see:
+> - `openhands/app_server/sandbox/e2b_sandbox_service.py` - E2B sandbox service
+> - `openhands/app_server/sandbox/e2b_sandbox_spec_service.py` - E2B template service
+> - `third_party/containers/e2b-sandbox/` - E2B template configuration
 
-## Getting started
+## Overview
 
-1. [Get your API key](https://e2b.dev/docs/getting-started/api-key)
+[E2B](https://e2b.dev) is an [open-source](https://github.com/e2b-dev/e2b) secure cloud environment (sandbox) made for running AI-generated code and agents.
 
-1. Set your E2B API key to the `E2B_API_KEY` env var when starting the Docker container
+## V1 Architecture
 
-1. **Optional** - Install the CLI with NPM.
-    ```sh
-    npm install -g @e2b/cli@latest
-    ```
-    Full CLI API is [here](https://e2b.dev/docs/cli/installation).
+In OpenHands V1, E2B integration works differently:
 
-## OpenHands sandbox
-You can use the E2B CLI to create a custom sandbox with a Dockerfile. Read the full guide [here](https://e2b.dev/docs/guide/custom-sandbox). The premade OpenHands sandbox for E2B is set up in the [`containers` directory](/containers/e2b-sandbox). and it's called `openhands`.
+1. **E2B Sandbox Service** (`e2b_sandbox_service.py`) communicates with the E2B API to create/manage micro VMs
+2. **Agent Server** runs inside each E2B micro VM
+3. **App Server** communicates with agent servers via HTTP
 
-## Debugging
-You can connect to a running E2B sandbox with E2B CLI in your terminal.
+See `/third_party/containers/e2b-sandbox/README.md` for setup instructions.
 
-- List all running sandboxes (based on your API key)
-    ```sh
-    e2b sandbox list
-    ```
+## Legacy V0 Usage
 
-- Connect to a running sandbox
-    ```sh
-    e2b sandbox connect <sandbox-id>
-    ```
+The files in this directory (`e2b_runtime.py`, `sandbox.py`, `filestore.py`) are for the legacy V0 runtime and will be removed in a future version.
 
 ## Links
-- [E2B Docs](https://e2b.dev/docs)
+
+- [E2B Documentation](https://e2b.dev/docs)
 - [E2B GitHub](https://github.com/e2b-dev/e2b)
+- [E2B Infrastructure (Self-Hosting)](https://github.com/e2b-dev/infra)

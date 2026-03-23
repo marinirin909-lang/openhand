@@ -1,14 +1,36 @@
-# This is a config for E2B sandbox template.
-# You can use 'template_id' (785n69crgahmz0lkdw9h) or 'template_name (openhands) from this config to spawn a sandbox:
-
-# Python SDK
-# from e2b import Sandbox
-# sandbox = Sandbox(template='openhands')
-
-# JS SDK
-# import { Sandbox } from 'e2b'
-# const sandbox = await Sandbox.create({ template: 'openhands' })
+# E2B sandbox template configuration for OpenHands V1
+#
+# This template creates an E2B micro VM running the OpenHands agent server.
+# The agent server provides a sandboxed environment for AI agents to execute
+# code, browse the web, and interact with files.
+#
+# Building the template:
+#   e2b template build --dockerfile ./Dockerfile --name "openhands"
+#
+# Using the template with self-hosted E2B:
+#   Configure your E2B API URL and use this template name to create sandboxes.
+#
+# Exposed ports:
+#   8000 - Agent Server API (main communication endpoint)
+#   8001 - VSCode Server (web-based IDE)
+#   8011 - Worker 1 (user application server)
+#   8012 - Worker 2 (user application server)
 
 dockerfile = "Dockerfile"
 template_name = "openhands"
-template_id = "785n69crgahmz0lkdw9h"
+
+# Note: template_id is assigned by E2B when the template is built.
+# For self-hosted E2B, this will be different from the cloud version.
+# The ID below is for reference only and should be updated after building.
+# template_id = "your-template-id-here"
+
+# Sandbox configuration
+[sandbox]
+# Default timeout for sandbox lifetime (1 hour)
+timeout = 3600
+
+# Memory allocation (in MB)
+memory = 2048
+
+# CPU allocation (number of vCPUs)
+cpus = 2
