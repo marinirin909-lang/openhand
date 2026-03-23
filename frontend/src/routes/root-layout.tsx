@@ -30,6 +30,11 @@ import { AlertBanner } from "#/components/features/alerts/alert-banner";
 import { cn } from "#/utils/utils";
 import { LoadingSpinner } from "#/components/shared/loading-spinner";
 import { useAppTitle } from "#/hooks/use-app-title";
+import {
+  InProgressMaintenanceBanners,
+  OngoingIncidentBanners,
+  ScheduledMaintenanceBanners,
+} from "#/components/features/incident/banners";
 
 export function ErrorBoundary() {
   const error = useRouteError();
@@ -244,6 +249,13 @@ export default function MainApp() {
               updatedAt={config.data.updated_at}
             />
           )}
+        {config.data?.app_mode === "saas" && (
+          <>
+            <OngoingIncidentBanners />
+            <InProgressMaintenanceBanners />
+            <ScheduledMaintenanceBanners />
+          </>
+        )}
         <div
           id="root-outlet"
           className="flex-1 relative overflow-auto custom-scrollbar"
