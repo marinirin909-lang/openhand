@@ -3045,6 +3045,163 @@ class TestPluginSpecModel:
         with pytest.raises(ValueError, match="cannot contain '..'"):
             PluginSpec(source='github:owner/repo', repo_path='../parent/path')
 
+    def test_plugin_spec_accepts_all_primitive_types(self):
+        """Test that PluginSpec accepts str, int, float, and bool parameter values."""
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        plugin = PluginSpec(
+            source='github:owner/repo',
+            parameters={
+                'name': 'test',
+                'count': 42,
+                'rate': 3.14,
+                'enabled': True,
+                'disabled': False,
+            },
+        )
+
+        assert plugin.parameters == {
+            'name': 'test',
+            'count': 42,
+            'rate': 3.14,
+            'enabled': True,
+            'disabled': False,
+        }
+
+    def test_plugin_spec_rejects_list_parameter(self):
+        """Test that PluginSpec rejects list values in parameters."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        with pytest.raises(ValueError, match="Parameter 'tags' has type 'list'"):
+            PluginSpec(
+                source='github:owner/repo',
+                parameters={'tags': ['a', 'b']},
+            )
+
+    def test_plugin_spec_rejects_dict_parameter(self):
+        """Test that PluginSpec rejects dict values in parameters."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        with pytest.raises(ValueError, match="Parameter 'config' has type 'dict'"):
+            PluginSpec(
+                source='github:owner/repo',
+                parameters={'config': {'nested': 'value'}},
+            )
+
+    def test_plugin_spec_rejects_nested_complex_types(self):
+        """Test that PluginSpec rejects various nested/complex types."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        complex_values: list[tuple[str, object]] = [
+            ('tuple_val', (1, 2, 3)),
+            ('set_val', {1, 2, 3}),
+            ('list_of_dicts', [{'key': 'val'}]),
+        ]
+
+        for param_name, param_value in complex_values:
+            with pytest.raises(ValueError, match=f"Parameter '{param_name}'"):
+                PluginSpec(
+                    source='github:owner/repo',
+                    parameters={param_name: param_value},
+                )
+
+    def test_plugin_spec_rejects_complex_params_via_model_validate(self):
+        """Test validation fires during deserialization from dict/JSON."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        with pytest.raises(ValueError, match="Parameter 'items' has type 'list'"):
+            PluginSpec.model_validate(
+                {
+                    'source': 'github:owner/repo',
+                    'parameters': {'items': [1, 2, 3]},
+                }
+            )
+
+    def test_plugin_spec_rejects_non_dict_parameters(self):
+        """Test that a non-dict value for parameters raises TypeError."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            PluginSpec(
+                source='github:owner/repo',
+                parameters='not-a-dict',  # type: ignore[arg-type]
+            )
+
+    def test_plugin_spec_allows_none_parameters(self):
+        """Test that None parameters pass validation."""
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        plugin = PluginSpec(source='github:owner/repo', parameters=None)
+        assert plugin.parameters is None
+
+    def test_plugin_spec_allows_empty_dict_parameters(self):
+        """Test that an empty dict passes validation."""
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        plugin = PluginSpec(source='github:owner/repo', parameters={})
+        assert plugin.parameters == {}
+
+    def test_plugin_spec_error_message_includes_type_name(self):
+        """Test that the error message includes the actual type name for debugging."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            PluginSpec,
+        )
+
+        with pytest.raises(ValueError, match="type 'list'.*not supported"):
+            PluginSpec(
+                source='github:owner/repo',
+                parameters={'bad': [1, 2]},
+            )
+
+    def test_start_request_rejects_complex_plugin_params(self):
+        """Test validation propagates through AppConversationStartRequest."""
+        import pytest
+
+        from openhands.app_server.app_conversation.app_conversation_models import (
+            AppConversationStartRequest,
+        )
+
+        with pytest.raises(ValueError, match="Parameter 'nested'"):
+            AppConversationStartRequest.model_validate(
+                {
+                    'title': 'Test',
+                    'plugins': [
+                        {
+                            'source': 'github:owner/repo',
+                            'parameters': {'nested': {'a': 1}},
+                        },
+                    ],
+                }
+            )
+
 
 class TestAppConversationStartRequestWithPlugins:
     """Test cases for AppConversationStartRequest with plugins field."""

@@ -1,9 +1,9 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from openhands.agent_server.models import OpenHandsModel, SendMessageRequest
 from openhands.agent_server.utils import OpenHandsUUID, utc_now
@@ -29,6 +29,9 @@ class AgentType(Enum):
     PLAN = 'plan'
 
 
+_PLUGIN_PARAM_PRIMITIVE_TYPES: tuple[type, ...] = (str, int, float, bool, type(None))
+
+
 class PluginSpec(PluginSource):
     """Specification for loading a plugin into a conversation.
 
@@ -36,10 +39,38 @@ class PluginSpec(PluginSource):
     Inherits source, ref, and repo_path fields along with their validation.
     """
 
-    parameters: dict[str, Any] | None = Field(
+    parameters: dict[str, str | int | float | bool] | None = Field(
         default=None,
         description='User-provided values for plugin input parameters',
     )
+
+    @field_validator('parameters', mode='before')
+    @classmethod
+    def validate_primitive_params(
+        cls,
+        v: dict[str, object] | None,
+    ) -> dict[str, str | int | float | bool] | None:
+        """Reject non-primitive parameter values.
+
+        Plugin parameters are rendered as form fields on the frontend
+        (text inputs, number inputs, checkboxes).  Complex types such as
+        lists or dicts fall through to ``String(value)`` and produce
+        unusable output like ``[object Object]``.  Catching them here
+        gives callers a clear error instead of silent data corruption.
+        """
+        if v is None:
+            return v
+        if not isinstance(v, dict):
+            raise TypeError(f'parameters must be a dict, got {type(v).__name__}')
+        for key, value in v.items():
+            if not isinstance(value, _PLUGIN_PARAM_PRIMITIVE_TYPES):
+                raise ValueError(
+                    f"Parameter '{key}' has type '{type(value).__name__}' "
+                    f'which is not supported. Only primitive types '
+                    f'(str, int, float, bool) are accepted as plugin '
+                    f'parameter values.'
+                )
+        return v  # type: ignore[return-value]
 
     @property
     def display_name(self) -> str:
