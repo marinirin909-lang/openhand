@@ -10,23 +10,16 @@ Focuses on high-impact scenarios:
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import httpx
 import pytest
 from integrations.slack.slack_v1_callback_processor import (
     SlackV1CallbackProcessor,
 )
+from integrations.utils import CONVERSATION_URL
+from integrations.v1_utils import BUDGET_EXCEEDED_USER_MESSAGE
 
-from openhands.app_server.app_conversation.app_conversation_models import (
-    AppConversationInfo,
-)
 from openhands.app_server.event_callback.event_callback_models import EventCallback
 from openhands.app_server.event_callback.event_callback_result_models import (
     EventCallbackResultStatus,
-)
-from openhands.app_server.sandbox.sandbox_models import (
-    ExposedUrl,
-    SandboxInfo,
-    SandboxStatus,
 )
 from openhands.events.action.message import MessageAction
 from openhands.sdk.event import ConversationStateUpdateEvent
@@ -59,34 +52,6 @@ def event_callback():
         conversation_id=uuid4(),
         processor=SlackV1CallbackProcessor(),
         event_kind='ConversationStateUpdateEvent',
-    )
-
-
-@pytest.fixture
-def mock_app_conversation_info():
-    return AppConversationInfo(
-        id=uuid4(),
-        created_by_user_id='test-user-123',
-        sandbox_id=str(uuid4()),
-        title='Test Conversation',
-    )
-
-
-@pytest.fixture
-def mock_sandbox_info():
-    return SandboxInfo(
-        id=str(uuid4()),
-        created_by_user_id='test-user-123',
-        sandbox_spec_id='test-spec-123',
-        status=SandboxStatus.RUNNING,
-        session_api_key='test-session-key',
-        exposed_urls=[
-            ExposedUrl(
-                url='http://localhost:8000',
-                name='AGENT_SERVER',
-                port=8000,
-            )
-        ],
     )
 
 
@@ -132,10 +97,10 @@ class TestSlackV1CallbackProcessor:
 
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
     @patch('integrations.slack.slack_v1_callback_processor.WebClient')
-    @patch.object(SlackV1CallbackProcessor, '_request_summary')
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
     async def test_double_callback_processing(
         self,
-        mock_request_summary,
+        mock_get_final_assistant_message,
         mock_web_client,
         mock_slack_team_store,
         slack_callback_processor,
@@ -150,8 +115,7 @@ class TestSlackV1CallbackProcessor:
         mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
         mock_slack_team_store.return_value = mock_store
 
-        # Mock successful summary generation
-        mock_request_summary.return_value = 'Test summary from agent'
+        mock_get_final_assistant_message.return_value = 'Test summary from agent'
 
         # Mock Slack WebClient
         mock_slack_client = MagicMock()
@@ -177,8 +141,7 @@ class TestSlackV1CallbackProcessor:
         assert result2.status == EventCallbackResultStatus.SUCCESS
         assert result2.detail == 'Test summary from agent'
 
-        # Verify both callbacks triggered summary requests and Slack posts
-        assert mock_request_summary.call_count == 2
+        assert mock_get_final_assistant_message.call_count == 2
         assert mock_slack_client.chat_postMessage.call_count == 2
 
     # -------------------------------------------------------------------------
@@ -186,24 +149,16 @@ class TestSlackV1CallbackProcessor:
     # -------------------------------------------------------------------------
 
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
-    @patch('openhands.app_server.config.get_httpx_client')
-    @patch('openhands.app_server.config.get_sandbox_service')
-    @patch('openhands.app_server.config.get_app_conversation_info_service')
-    @patch('integrations.slack.slack_v1_callback_processor.get_summary_instruction')
     @patch('integrations.slack.slack_v1_callback_processor.WebClient')
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
     async def test_successful_end_to_end_flow(
         self,
+        mock_get_final_assistant_message,
         mock_web_client,
-        mock_get_summary_instruction,
-        mock_get_app_conversation_info_service,
-        mock_get_sandbox_service,
-        mock_get_httpx_client,
         mock_slack_team_store,
         slack_callback_processor,
         finish_event,
         event_callback,
-        mock_app_conversation_info,
-        mock_sandbox_info,
     ):
         """Test successful end-to-end callback execution."""
         conversation_id = uuid4()
@@ -213,48 +168,21 @@ class TestSlackV1CallbackProcessor:
         mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
         mock_slack_team_store.return_value = mock_store
 
-        # Mock summary instruction
-        mock_get_summary_instruction.return_value = 'Please provide a summary'
+        mock_get_final_assistant_message.return_value = 'Test summary from agent'
 
-        # Mock services
-        mock_app_conversation_info_service = AsyncMock()
-        mock_app_conversation_info_service.get_app_conversation_info.return_value = (
-            mock_app_conversation_info
-        )
-        mock_get_app_conversation_info_service.return_value.__aenter__.return_value = (
-            mock_app_conversation_info_service
-        )
-
-        mock_sandbox_service = AsyncMock()
-        mock_sandbox_service.get_sandbox.return_value = mock_sandbox_info
-        mock_get_sandbox_service.return_value.__aenter__.return_value = (
-            mock_sandbox_service
-        )
-
-        mock_httpx_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.json.return_value = {'response': 'Test summary from agent'}
-        mock_response.raise_for_status = MagicMock()
-        mock_httpx_client.post.return_value = mock_response
-        mock_get_httpx_client.return_value.__aenter__.return_value = mock_httpx_client
-
-        # Mock Slack WebClient
         mock_slack_client = MagicMock()
         mock_slack_client.chat_postMessage.return_value = {'ok': True}
         mock_web_client.return_value = mock_slack_client
 
-        # Execute
         result = await slack_callback_processor(
             conversation_id, event_callback, finish_event
         )
 
-        # Verify result
         assert result is not None
         assert result.status == EventCallbackResultStatus.SUCCESS
         assert result.conversation_id == conversation_id
         assert result.detail == 'Test summary from agent'
 
-        # Verify Slack posting
         mock_slack_client.chat_postMessage.assert_called_once_with(
             channel='C1234567890',
             text='Test summary from agent',
@@ -275,10 +203,10 @@ class TestSlackV1CallbackProcessor:
         ],
     )
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
-    @patch.object(SlackV1CallbackProcessor, '_request_summary')
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
     async def test_missing_bot_token_scenarios(
         self,
-        mock_request_summary,
+        mock_get_final_assistant_message,
         mock_slack_team_store,
         slack_callback_processor,
         finish_event,
@@ -292,8 +220,7 @@ class TestSlackV1CallbackProcessor:
         mock_store.get_team_bot_token = AsyncMock(return_value=bot_token)
         mock_slack_team_store.return_value = mock_store
 
-        # Mock successful summary generation
-        mock_request_summary.return_value = 'Test summary'
+        mock_get_final_assistant_message.return_value = 'Test summary'
 
         result = await slack_callback_processor(uuid4(), event_callback, finish_event)
 
@@ -314,10 +241,10 @@ class TestSlackV1CallbackProcessor:
     )
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
     @patch('integrations.slack.slack_v1_callback_processor.WebClient')
-    @patch.object(SlackV1CallbackProcessor, '_request_summary')
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
     async def test_slack_api_error_scenarios(
         self,
-        mock_request_summary,
+        mock_get_final_assistant_message,
         mock_web_client,
         mock_slack_team_store,
         slack_callback_processor,
@@ -332,8 +259,7 @@ class TestSlackV1CallbackProcessor:
         mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
         mock_slack_team_store.return_value = mock_store
 
-        # Mock successful summary generation
-        mock_request_summary.return_value = 'Test summary'
+        mock_get_final_assistant_message.return_value = 'Test summary'
 
         # Mock Slack WebClient with error response
         mock_slack_client = MagicMock()
@@ -346,150 +272,73 @@ class TestSlackV1CallbackProcessor:
         assert result.status == EventCallbackResultStatus.ERROR
         assert expected_error in result.detail
 
-    @pytest.mark.parametrize(
-        'exception,expected_error_fragment',
-        [
-            (
-                httpx.TimeoutException('Request timeout'),
-                'Request timeout after 30 seconds',
-            ),
-            (
-                httpx.HTTPStatusError(
-                    'Server error',
-                    request=MagicMock(),
-                    response=MagicMock(
-                        status_code=500, text='Internal Server Error', headers={}
-                    ),
-                ),
-                'Failed to send message to agent server',
-            ),
-            (
-                httpx.RequestError('Connection error'),
-                'Request error',
-            ),
-        ],
-    )
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
-    @patch('openhands.app_server.config.get_httpx_client')
-    @patch('openhands.app_server.config.get_sandbox_service')
-    @patch('openhands.app_server.config.get_app_conversation_info_service')
-    @patch('integrations.slack.slack_v1_callback_processor.get_summary_instruction')
-    async def test_agent_server_error_scenarios(
+    @patch('integrations.slack.slack_v1_callback_processor.WebClient')
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
+    async def test_error_posts_sanitized_message_via_handle_callback_error(
         self,
-        mock_get_summary_instruction,
-        mock_get_app_conversation_info_service,
-        mock_get_sandbox_service,
-        mock_get_httpx_client,
+        mock_get_final_assistant_message,
+        mock_web_client,
         mock_slack_team_store,
         slack_callback_processor,
         finish_event,
         event_callback,
-        mock_app_conversation_info,
-        mock_sandbox_info,
-        exception,
-        expected_error_fragment,
     ):
-        """Test error handling for various agent server errors."""
+        """Test that when an error occurs, handle_callback_error posts a sanitized message to Slack."""
         conversation_id = uuid4()
 
         # Mock SlackTeamStore (async method)
         mock_store = MagicMock()
         mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
         mock_slack_team_store.return_value = mock_store
+        mock_slack_client = MagicMock()
+        mock_slack_client.chat_postMessage.return_value = {'ok': True}
+        mock_web_client.return_value = mock_slack_client
 
-        # Mock summary instruction
-        mock_get_summary_instruction.return_value = 'Please provide a summary'
-
-        # Mock services
-        mock_app_conversation_info_service = AsyncMock()
-        mock_app_conversation_info_service.get_app_conversation_info.return_value = (
-            mock_app_conversation_info
-        )
-        mock_get_app_conversation_info_service.return_value.__aenter__.return_value = (
-            mock_app_conversation_info_service
+        mock_get_final_assistant_message.side_effect = RuntimeError(
+            'EventService unavailable'
         )
 
-        mock_sandbox_service = AsyncMock()
-        mock_sandbox_service.get_sandbox.return_value = mock_sandbox_info
-        mock_get_sandbox_service.return_value.__aenter__.return_value = (
-            mock_sandbox_service
-        )
-
-        # Mock HTTP client with the specified exception
-        mock_httpx_client = AsyncMock()
-        mock_httpx_client.post.side_effect = exception
-        mock_get_httpx_client.return_value.__aenter__.return_value = mock_httpx_client
-
-        # Execute
         result = await slack_callback_processor(
             conversation_id, event_callback, finish_event
         )
 
-        # Verify error result
         assert result is not None
         assert result.status == EventCallbackResultStatus.ERROR
-        assert expected_error_fragment in result.detail
+        assert 'EventService unavailable' in result.detail
+        mock_slack_client.chat_postMessage.assert_called_once()
+        call_args = mock_slack_client.chat_postMessage.call_args
+        posted_text = call_args.kwargs['text']
+        # handle_callback_error wraps error in a friendly format
+        assert 'OpenHands encountered an error' in posted_text
+        assert 'EventService unavailable' in posted_text
+        assert CONVERSATION_URL.format(conversation_id) in posted_text
 
     @patch('storage.slack_team_store.SlackTeamStore.get_instance')
-    @patch('openhands.app_server.config.get_httpx_client')
-    @patch('openhands.app_server.config.get_sandbox_service')
-    @patch('openhands.app_server.config.get_app_conversation_info_service')
-    @patch('integrations.slack.slack_v1_callback_processor.get_summary_instruction')
-    @patch('integrations.slack.slack_v1_callback_processor._logger')
     @patch('integrations.slack.slack_v1_callback_processor.WebClient')
-    async def test_budget_exceeded_error_logs_info_and_sends_friendly_message(
+    @patch.object(SlackV1CallbackProcessor, '_get_final_assistant_message')
+    async def test_budget_exceeded_error_posts_friendly_message(
         self,
-        mock_web_client_cls,
-        mock_logger,
-        mock_get_summary_instruction,
-        mock_get_app_conversation_info_service,
-        mock_get_sandbox_service,
-        mock_get_httpx_client,
+        mock_get_final_assistant_message,
+        mock_web_client,
         mock_slack_team_store,
         slack_callback_processor,
         finish_event,
         event_callback,
-        mock_app_conversation_info,
-        mock_sandbox_info,
     ):
-        """Test that budget exceeded errors are logged at INFO level and user gets friendly message."""
+        """Test that budget-exceeded errors post a friendly user message, not raw error text."""
         conversation_id = uuid4()
 
-        # Mock SlackTeamStore
         mock_store = MagicMock()
         mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
         mock_slack_team_store.return_value = mock_store
-
-        mock_get_summary_instruction.return_value = 'Please provide a summary'
-
-        # Mock services
-        mock_app_conversation_info_service = AsyncMock()
-        mock_app_conversation_info_service.get_app_conversation_info.return_value = (
-            mock_app_conversation_info
-        )
-        mock_get_app_conversation_info_service.return_value.__aenter__.return_value = (
-            mock_app_conversation_info_service
-        )
-
-        mock_sandbox_service = AsyncMock()
-        mock_sandbox_service.get_sandbox.return_value = mock_sandbox_info
-        mock_get_sandbox_service.return_value.__aenter__.return_value = (
-            mock_sandbox_service
-        )
-
-        # Simulate a budget exceeded error from the agent server
-        budget_error_msg = (
-            'HTTP 500 error: {"detail":"Internal Server Error",'
-            '"exception":"litellm.BadRequestError: Litellm_proxyException - '
-            'Budget has been exceeded! Current cost: 12.65, Max budget: 12.62"}'
-        )
-        mock_httpx_client = AsyncMock()
-        mock_httpx_client.post.side_effect = Exception(budget_error_msg)
-        mock_get_httpx_client.return_value.__aenter__.return_value = mock_httpx_client
-
-        # Mock Slack WebClient
         mock_slack_client = MagicMock()
-        mock_web_client_cls.return_value = mock_slack_client
+        mock_slack_client.chat_postMessage.return_value = {'ok': True}
+        mock_web_client.return_value = mock_slack_client
+
+        mock_get_final_assistant_message.side_effect = RuntimeError(
+            'LLM budget exceeded for this workspace'
+        )
 
         result = await slack_callback_processor(
             conversation_id, event_callback, finish_event
@@ -497,21 +346,70 @@ class TestSlackV1CallbackProcessor:
 
         assert result is not None
         assert result.status == EventCallbackResultStatus.ERROR
-
-        # Verify exception was NOT called (budget exceeded uses info instead)
-        mock_logger.exception.assert_not_called()
-
-        # Verify budget exceeded info log was called
-        info_calls = [str(call) for call in mock_logger.info.call_args_list]
-        budget_log_found = any('Budget exceeded' in call for call in info_calls)
-        assert budget_log_found, f'Expected budget exceeded log, got: {info_calls}'
-
-        # Verify user-friendly message was posted to Slack
         mock_slack_client.chat_postMessage.assert_called_once()
-        call_kwargs = mock_slack_client.chat_postMessage.call_args[1]
-        posted_message = call_kwargs.get('text', '')
-        assert 'OpenHands encountered an error' in posted_message
-        assert 'LLM budget has been exceeded' in posted_message
-        assert 'please re-fill' in posted_message
-        # Should NOT contain the raw error message
-        assert 'litellm.BadRequestError' not in posted_message
+        call_args = mock_slack_client.chat_postMessage.call_args
+        posted_text = call_args.kwargs['text']
+        # Budget-exceeded errors should show the friendly message, not raw error
+        assert BUDGET_EXCEEDED_USER_MESSAGE in posted_text
+        assert 'LLM budget exceeded for this workspace' not in posted_text
+        assert CONVERSATION_URL.format(conversation_id) in posted_text
+
+    @patch('storage.slack_team_store.SlackTeamStore.get_instance')
+    @patch('integrations.slack.slack_v1_callback_processor.WebClient')
+    @patch('openhands.app_server.config.get_event_service')
+    async def test_get_final_assistant_message_uses_event_service_and_posts_content(
+        self,
+        mock_get_event_service,
+        mock_web_client,
+        mock_slack_team_store,
+        slack_callback_processor,
+        finish_event,
+        event_callback,
+    ):
+        """Test that final assistant message is fetched from EventService and posted to Slack."""
+        from openhands.agent_server.models import EventPage
+        from openhands.sdk import Message, MessageEvent, TextContent
+
+        conversation_id = uuid4()
+        mock_store = MagicMock()
+        mock_store.get_team_bot_token = AsyncMock(return_value='xoxb-test-token')
+        mock_slack_team_store.return_value = mock_store
+        mock_slack_client = MagicMock()
+        mock_slack_client.chat_postMessage.return_value = {'ok': True}
+        mock_web_client.return_value = mock_slack_client
+
+        assistant_message = MessageEvent(
+            source='agent',
+            llm_message=Message(
+                role='assistant',
+                content=[TextContent(text='Here is the fix you asked for.')],
+            ),
+        )
+        mock_event_service = AsyncMock()
+        mock_event_service.search_events.return_value = EventPage(
+            items=[assistant_message],
+            next_page_id=None,
+        )
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = mock_event_service
+        mock_context.__aexit__.return_value = None
+        mock_get_event_service.return_value = mock_context
+
+        result = await slack_callback_processor(
+            conversation_id, event_callback, finish_event
+        )
+
+        assert result is not None
+        assert result.status == EventCallbackResultStatus.SUCCESS
+        assert result.detail == 'Here is the fix you asked for.'
+        mock_event_service.search_events.assert_called_once()
+        call_kw = mock_event_service.search_events.call_args.kwargs
+        assert call_kw['conversation_id'] == conversation_id
+        assert call_kw['kind__eq'] == 'MessageEvent'
+        mock_slack_client.chat_postMessage.assert_called_once_with(
+            channel='C1234567890',
+            text='Here is the fix you asked for.',
+            thread_ts='1234567890.123456',
+            unfurl_links=False,
+            unfurl_media=False,
+        )
