@@ -2,11 +2,11 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from server.auth.admin_auth import get_admin_user_id
 from server.auth.authorization import (
     Permission,
     require_permission,
 )
-from server.email_validation import get_admin_user_id
 from server.routes.org_models import (
     CannotModifySelfError,
     InsufficientPermissionError,
@@ -149,9 +149,8 @@ async def create_org(
 ) -> OrgResponse:
     """Create a new organization.
 
-    This endpoint allows authenticated users with @openhands.dev email to create
-    a new organization. The user who creates the organization automatically becomes
-    its owner.
+    This endpoint allows authenticated admin users to create a new organization.
+    The user who creates the organization automatically becomes its owner.
 
     Args:
         org_data: Organization creation data
@@ -161,7 +160,7 @@ async def create_org(
         OrgResponse: The created organization details
 
     Raises:
-        HTTPException: 403 if user email domain is not @openhands.dev
+        HTTPException: 403 if user does not have admin role
         HTTPException: 409 if organization name already exists
         HTTPException: 500 if creation fails
     """

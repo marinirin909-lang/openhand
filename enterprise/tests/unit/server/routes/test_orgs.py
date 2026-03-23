@@ -11,7 +11,7 @@ import httpx
 import pytest
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.testclient import TestClient
-from server.email_validation import get_admin_user_id
+from server.auth.admin_auth import get_admin_user_id
 from server.routes.org_models import (
     CannotModifySelfError,
     InsufficientPermissionError,
