@@ -626,6 +626,9 @@ async def refresh_tokens(
     """Return the latest token for a given provider."""
     user_id = _get_user_id(sid)
     session_api_key = await _get_session_api_key(user_id, sid)
+    logger.debug(
+        f'Refresh token request for user_id: {user_id}, sid: {sid}, session_api_key: {session_api_key}, x_session_api_key: {x_session_api_key}, session_api_key == x_session_api_key: {session_api_key == x_session_api_key}'
+    )
     if session_api_key != x_session_api_key:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
 
