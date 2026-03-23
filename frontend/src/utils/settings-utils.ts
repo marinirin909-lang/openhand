@@ -68,6 +68,52 @@ export const parseMaxBudgetPerTask = (value: string): number | null => {
     : null;
 };
 
+/**
+ * Regex pattern for validating marketplace_path.
+ * Only relative JSON paths within the public skills repository are supported.
+ */
+const MARKETPLACE_PATH_PATTERN = /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)+\.json$/;
+
+/**
+ * Validates a marketplace path value.
+ * @param value - The marketplace path to validate
+ * @returns true if valid or empty, false otherwise
+ */
+export const isValidMarketplacePath = (value: string): boolean => {
+  // Empty string is valid (means no marketplace filtering)
+  if (!value || value.trim() === "") {
+    return true;
+  }
+
+  const trimmedValue = value.trim();
+
+  // Security: block path traversal, absolute paths, and unsupported path formats
+  if (
+    trimmedValue.startsWith("/") ||
+    trimmedValue.includes(":") ||
+    trimmedValue.includes("..") ||
+    trimmedValue.includes("\\")
+  ) {
+    return false;
+  }
+
+  return MARKETPLACE_PATH_PATTERN.test(trimmedValue);
+};
+
+/**
+ * Parses marketplace path input.
+ * @param value - The input string value
+ * @returns The trimmed value if non-empty, null otherwise (null = load all skills)
+ */
+export const parseMarketplacePath = (
+  value: string | undefined,
+): string | null => {
+  if (!value || value.trim() === "") {
+    return null;
+  }
+  return value.trim();
+};
+
 export const extractSettings = (formData: FormData): Partial<Settings> => {
   const { LLM_MODEL, LLM_API_KEY, AGENT, LANGUAGE } =
     extractBasicFormData(formData);

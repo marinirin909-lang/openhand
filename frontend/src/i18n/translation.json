@@ -14364,6 +14364,91 @@
     "uk": "Електронна пошта Git",
     "ca": "Correu electrònic de Git"
   },
+  "SETTINGS$SKILLS_SETTINGS": {
+    "en": "Skills Settings",
+    "ja": "スキル設定",
+    "zh-CN": "技能设置",
+    "zh-TW": "技能設定",
+    "ko-KR": "스킬 설정",
+    "no": "Ferdighetsinnstillinger",
+    "it": "Impostazioni abilità",
+    "pt": "Configurações de habilidades",
+    "es": "Configuración de habilidades",
+    "ar": "إعدادات المهارات",
+    "fr": "Paramètres des compétences",
+    "tr": "Beceri Ayarları",
+    "de": "Fähigkeitseinstellungen",
+    "uk": "Налаштування навичок",
+    "ca": "Configuració d'habilitats"
+  },
+  "SETTINGS$SKILLS_SETTINGS_DESCRIPTION": {
+    "en": "Configure which skills are loaded from the public skills marketplace.",
+    "ja": "公開スキルマーケットプレイスから読み込むスキルを設定します。",
+    "zh-CN": "配置从公共技能市场加载哪些技能。",
+    "zh-TW": "設定從公開技能市場載入哪些技能。",
+    "ko-KR": "공개 스킬 마켓플레이스에서 로드할 스킬을 설정합니다.",
+    "no": "Konfigurer hvilke ferdigheter som lastes fra den offentlige ferdighetsmarkedsplassen.",
+    "it": "Configura quali abilità vengono caricate dal marketplace pubblico delle abilità.",
+    "pt": "Configure quais habilidades são carregadas do marketplace público de habilidades.",
+    "es": "Configura qué habilidades se cargan del mercado público de habilidades.",
+    "ar": "قم بتكوين المهارات التي يتم تحميلها من سوق المهارات العام.",
+    "fr": "Configurez les compétences chargées depuis le marketplace public de compétences.",
+    "tr": "Herkese açık beceri pazarından hangi becerilerin yükleneceğini yapılandırın.",
+    "de": "Konfigurieren Sie, welche Fähigkeiten vom öffentlichen Fähigkeitsmarktplatz geladen werden.",
+    "uk": "Налаштуйте, які навички завантажуються з публічного маркетплейсу навичок.",
+    "ca": "Configura quines habilitats es carreguen des del mercat públic d'habilitats."
+  },
+  "SETTINGS$MARKETPLACE_PATH": {
+    "en": "Marketplace Path",
+    "ja": "マーケットプレイスパス",
+    "zh-CN": "市场路径",
+    "zh-TW": "市場路徑",
+    "ko-KR": "마켓플레이스 경로",
+    "no": "Markedsplassti",
+    "it": "Percorso marketplace",
+    "pt": "Caminho do marketplace",
+    "es": "Ruta del mercado",
+    "ar": "مسار السوق",
+    "fr": "Chemin du marketplace",
+    "tr": "Pazar yeri yolu",
+    "de": "Marktplatz-Pfad",
+    "uk": "Шлях до маркетплейсу",
+    "ca": "Camí del mercat"
+  },
+  "SETTINGS$MARKETPLACE_PATH_DESCRIPTION": {
+    "en": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "ja": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "zh-CN": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "zh-TW": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "ko-KR": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "no": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "it": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "pt": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "es": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "ar": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "fr": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "tr": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "de": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "uk": "Relative path to the marketplace JSON file in the public skills repository, for example 'marketplaces/default.json'. Leave empty to load all skills without filtering.",
+    "ca": "Camí relatiu al fitxer JSON del mercat al repositori públic d'habilitats, per exemple 'marketplaces/default.json'. Deixa-ho buit per carregar totes les habilitats sense filtrar."
+  },
+  "SETTINGS$MARKETPLACE_PATH_INVALID": {
+    "en": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "ja": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "zh-CN": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "zh-TW": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "ko-KR": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "no": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "it": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "pt": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "es": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "ar": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "fr": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "tr": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "de": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "uk": "Invalid marketplace path format. Use a relative JSON path like 'marketplaces/default.json'.",
+    "ca": "Format de camí del mercat no vàlid. Utilitza un camí JSON relatiu com 'marketplaces/default.json'."
+  },
   "PROJECT_MANAGEMENT$TITLE": {
     "en": "Project Management",
     "ja": "プロジェクト管理",
@@ -17472,8 +17557,7 @@
     "fr": "Nom de l'organisation",
     "tr": "Organizasyon Adı",
     "de": "Organisationsname",
-    "uk": "Назва організації"
-  ,
+    "uk": "Назва організації",
     "ca": "Nom de l'organització"
   },
   "ORG$NEXT": {
@@ -18901,8 +18985,7 @@
     "pt": "Erro",
     "es": "Error",
     "tr": "Hata",
-    "uk": "Помилка"
-  ,
+    "uk": "Помилка",
     "ca": "Error"
   },
   "HOOK$OUTPUT": {
@@ -19123,8 +19206,7 @@
     "pt": "Nome da organização",
     "es": "Nombre de la organización",
     "tr": "Organizasyon adı",
-    "uk": "Назва організації"
-  ,
+    "uk": "Назва організації",
     "ca": "Nom de l'organització"
   },
   "ONBOARDING$ORG_NAME_INPUT_DOMAIN": {
@@ -19940,8 +20022,7 @@
     "pt": "Saiba mais",
     "es": "Más información",
     "tr": "Daha Fazla Bilgi",
-    "uk": "Дізнатися більше"
-  ,
+    "uk": "Дізнатися більше",
     "ca": "Més informació"
   },
   "ENTERPRISE$LEARN_MORE_ARIA": {
@@ -19992,8 +20073,7 @@
     "pt": "Erro",
     "es": "Error",
     "tr": "Hata",
-    "uk": "Помилка"
-  ,
+    "uk": "Помилка",
     "ca": "Error"
   },
   "DEVICE$SUCCESS_MESSAGE": {
@@ -20367,8 +20447,7 @@
     "fr": "En savoir plus",
     "tr": "Daha fazla bilgi",
     "de": "Mehr erfahren",
-    "uk": "Дізнатися більше"
-  ,
+    "uk": "Дізнатися більше",
     "ca": "Més informació"
   }
 }

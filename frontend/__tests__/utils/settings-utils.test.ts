@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseMaxBudgetPerTask, extractSettings } from "#/utils/settings-utils";
+import {
+  parseMaxBudgetPerTask,
+  extractSettings,
+  isValidMarketplacePath,
+  parseMarketplacePath,
+} from "#/utils/settings-utils";
 
 describe("parseMaxBudgetPerTask", () => {
   it("should return null for empty string", () => {
@@ -87,5 +92,72 @@ describe("extractSettings", () => {
     // Custom model should take precedence and preserve case
     expect(settings.llm_model).toBe("Custom-Model-Name");
     expect(settings.llm_model).not.toBe("custom-model-name");
+  });
+});
+
+describe("isValidMarketplacePath", () => {
+  it("should return true for empty string (no marketplace filtering)", () => {
+    expect(isValidMarketplacePath("")).toBe(true);
+  });
+
+  it("should return true for whitespace-only string", () => {
+    expect(isValidMarketplacePath("   ")).toBe(true);
+  });
+
+  it("should return true for valid simple paths", () => {
+    expect(isValidMarketplacePath("marketplaces/default.json")).toBe(true);
+    expect(isValidMarketplacePath("path/to/file.json")).toBe(true);
+  });
+
+  it("should return false for invalid paths", () => {
+    // Path traversal attempts
+    expect(isValidMarketplacePath("../../../etc/passwd")).toBe(false);
+    expect(isValidMarketplacePath("../secret.json")).toBe(false);
+    expect(isValidMarketplacePath("marketplaces/%2e%2e/secret.json")).toBe(
+      false,
+    );
+
+    // Unsupported absolute or cross-repo paths
+    expect(isValidMarketplacePath("/marketplaces/default.json")).toBe(false);
+    expect(isValidMarketplacePath("owner/repo:path/to/marketplace.json")).toBe(
+      false,
+    );
+
+    // Missing directory component or extension
+    expect(isValidMarketplacePath("skills.json")).toBe(false);
+    expect(isValidMarketplacePath("my-marketplace.json")).toBe(false);
+    expect(isValidMarketplacePath("my_marketplace.json")).toBe(false);
+    expect(isValidMarketplacePath("marketplaces/default")).toBe(false);
+
+    // Invalid characters
+    expect(isValidMarketplacePath("path/to/file.json?query=1")).toBe(false);
+    expect(isValidMarketplacePath("path with spaces.json")).toBe(false);
+    expect(isValidMarketplacePath("marketplaces\\default.json")).toBe(false);
+    expect(isValidMarketplacePath("owner:path.json")).toBe(false);
+    expect(isValidMarketplacePath(":path/file.json")).toBe(false);
+  });
+});
+
+describe("parseMarketplacePath", () => {
+  it("should return null for undefined", () => {
+    expect(parseMarketplacePath(undefined)).toBeNull();
+  });
+
+  it("should return null for empty string", () => {
+    expect(parseMarketplacePath("")).toBeNull();
+  });
+
+  it("should return null for whitespace-only string", () => {
+    expect(parseMarketplacePath("   ")).toBeNull();
+    expect(parseMarketplacePath("\t\n")).toBeNull();
+  });
+
+  it("should return trimmed value for non-empty strings", () => {
+    expect(parseMarketplacePath("marketplaces/default.json")).toBe(
+      "marketplaces/default.json",
+    );
+    expect(parseMarketplacePath("  marketplaces/default.json  ")).toBe(
+      "marketplaces/default.json",
+    );
   });
 });

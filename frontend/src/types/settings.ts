@@ -78,5 +78,6 @@ export type Settings = {
   git_user_name?: string;
   git_user_email?: string;
   v1_enabled?: boolean;
+  marketplace_path?: string | null;
   sandbox_grouping_strategy?: SandboxGroupingStrategy;
 };

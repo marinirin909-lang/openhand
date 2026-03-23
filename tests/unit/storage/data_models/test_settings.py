@@ -1,7 +1,8 @@
 import warnings
 from unittest.mock import patch
 
-from pydantic import SecretStr
+import pytest
+from pydantic import SecretStr, ValidationError
 
 from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.openhands_config import OpenHandsConfig
@@ -127,3 +128,49 @@ def test_settings_no_pydantic_frozen_field_warning():
         assert len(frozen_warnings) == 0, (
             f'Pydantic frozen field warnings found: {[str(w.message) for w in frozen_warnings]}'
         )
+
+
+def test_settings_marketplace_path_default():
+    """Test that marketplace_path defaults to None (load all skills)."""
+    settings = Settings()
+    assert settings.marketplace_path is None
+
+
+def test_settings_marketplace_path_custom():
+    """Test that marketplace_path can be set to a custom value."""
+    settings = Settings(marketplace_path='marketplaces/custom.json')
+    assert settings.marketplace_path == 'marketplaces/custom.json'
+
+
+def test_settings_marketplace_path_none_explicit():
+    """Test that marketplace_path can be explicitly set to None."""
+    settings = Settings(marketplace_path=None)
+    assert settings.marketplace_path is None
+
+
+def test_settings_marketplace_path_trims_whitespace():
+    settings = Settings(marketplace_path='  marketplaces/custom.json  ')
+    assert settings.marketplace_path == 'marketplaces/custom.json'
+
+
+def test_settings_marketplace_path_blank_string_maps_to_none():
+    settings = Settings(marketplace_path='   ')
+    assert settings.marketplace_path is None
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        '/marketplaces/default.json',
+        '../secret.json',
+        'owner/repo:path/to/marketplace.json',
+        'marketplaces\\default.json',
+        'marketplaces/default',
+        'marketplaces/%2e%2e/secret.json',
+        'skills.json',
+        'my-marketplace.json',
+    ],
+)
+def test_settings_marketplace_path_rejects_invalid_values(value: str):
+    with pytest.raises(ValidationError):
+        Settings(marketplace_path=value)

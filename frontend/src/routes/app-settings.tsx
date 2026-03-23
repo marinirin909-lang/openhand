@@ -19,7 +19,11 @@ import {
 import { retrieveAxiosErrorMessage } from "#/utils/retrieve-axios-error-message";
 import { AppSettingsInputsSkeleton } from "#/components/features/settings/app-settings/app-settings-inputs-skeleton";
 import { useConfig } from "#/hooks/query/use-config";
-import { parseMaxBudgetPerTask } from "#/utils/settings-utils";
+import {
+  isValidMarketplacePath,
+  parseMarketplacePath,
+  parseMaxBudgetPerTask,
+} from "#/utils/settings-utils";
 import {
   SandboxGroupingStrategy,
   SandboxGroupingStrategyOptions,
@@ -31,6 +35,18 @@ export const clientLoader = createPermissionGuard(
   "manage_application_settings",
 );
 
+type ChangedField =
+  | "language"
+  | "analytics"
+  | "soundNotifications"
+  | "proactiveConversations"
+  | "solvabilityAnalysis"
+  | "sandboxGroupingStrategy"
+  | "maxBudgetPerTask"
+  | "gitUserName"
+  | "gitUserEmail"
+  | "marketplacePath";
+
 function AppSettingsScreen() {
   const posthog = usePostHog();
   const { t } = useTranslation();
@@ -39,34 +55,29 @@ function AppSettingsScreen() {
   const { data: settings, isLoading } = useSettings();
   const { data: config } = useConfig();
 
-  const [languageInputHasChanged, setLanguageInputHasChanged] =
-    React.useState(false);
-  const [analyticsSwitchHasChanged, setAnalyticsSwitchHasChanged] =
-    React.useState(false);
-  const [
-    soundNotificationsSwitchHasChanged,
-    setSoundNotificationsSwitchHasChanged,
-  ] = React.useState(false);
-  const [
-    proactiveConversationsSwitchHasChanged,
-    setProactiveConversationsSwitchHasChanged,
-  ] = React.useState(false);
-  const [
-    solvabilityAnalysisSwitchHasChanged,
-    setSolvabilityAnalysisSwitchHasChanged,
-  ] = React.useState(false);
-  const [
-    sandboxGroupingStrategyHasChanged,
-    setSandboxGroupingStrategyHasChanged,
-  ] = React.useState(false);
+  const [changedFields, setChangedFields] = React.useState<Set<ChangedField>>(
+    new Set<ChangedField>(),
+  );
   const [selectedSandboxGroupingStrategy, setSelectedSandboxGroupingStrategy] =
     React.useState<SandboxGroupingStrategy | null>(null);
-  const [maxBudgetPerTaskHasChanged, setMaxBudgetPerTaskHasChanged] =
-    React.useState(false);
-  const [gitUserNameHasChanged, setGitUserNameHasChanged] =
-    React.useState(false);
-  const [gitUserEmailHasChanged, setGitUserEmailHasChanged] =
-    React.useState(false);
+  const [marketplacePathError, setMarketplacePathError] = React.useState<
+    string | null
+  >(null);
+
+  const setFieldChanged = React.useCallback(
+    (field: ChangedField, changed: boolean) => {
+      setChangedFields((currentFields) => {
+        const nextFields = new Set(currentFields);
+        if (changed) {
+          nextFields.add(field);
+        } else {
+          nextFields.delete(field);
+        }
+        return nextFields;
+      });
+    },
+    [],
+  );
 
   const formAction = (formData: FormData) => {
     const languageLabel = formData.get("language-input")?.toString();
@@ -104,6 +115,17 @@ function AppSettingsScreen() {
       formData.get("git-user-email-input")?.toString() ||
       DEFAULT_SETTINGS.git_user_email;
 
+    const marketplacePathValue = formData
+      .get("marketplace-path-input")
+      ?.toString();
+
+    if (!isValidMarketplacePath(marketplacePathValue || "")) {
+      setMarketplacePathError(t(I18nKey.SETTINGS$MARKETPLACE_PATH_INVALID));
+      return;
+    }
+
+    const marketplacePath = parseMarketplacePath(marketplacePathValue);
+
     saveSettings(
       {
         language,
@@ -115,26 +137,19 @@ function AppSettingsScreen() {
         max_budget_per_task: maxBudgetPerTask,
         git_user_name: gitUserName,
         git_user_email: gitUserEmail,
+        marketplace_path: marketplacePath,
       },
       {
         onSuccess: () => {
           handleCaptureConsent(posthog, enableAnalytics);
+          setChangedFields(new Set<ChangedField>());
+          setSelectedSandboxGroupingStrategy(null);
+          setMarketplacePathError(null);
           displaySuccessToast(t(I18nKey.SETTINGS$SAVED));
         },
         onError: (error) => {
           const errorMessage = retrieveAxiosErrorMessage(error);
           displayErrorToast(errorMessage || t(I18nKey.ERROR$GENERIC));
-        },
-        onSettled: () => {
-          setLanguageInputHasChanged(false);
-          setAnalyticsSwitchHasChanged(false);
-          setSoundNotificationsSwitchHasChanged(false);
-          setProactiveConversationsSwitchHasChanged(false);
-          setSandboxGroupingStrategyHasChanged(false);
-          setSelectedSandboxGroupingStrategy(null);
-          setMaxBudgetPerTaskHasChanged(false);
-          setGitUserNameHasChanged(false);
-          setGitUserEmailHasChanged(false);
         },
       },
     );
@@ -148,18 +163,19 @@ function AppSettingsScreen() {
       ({ value: langValue }) => langValue === settings?.language,
     )?.label;
 
-    setLanguageInputHasChanged(selectedLanguage !== currentLanguage);
+    setFieldChanged("language", selectedLanguage !== currentLanguage);
   };
 
   const checkIfAnalyticsSwitchHasChanged = (checked: boolean) => {
     // Treat null as true since analytics is opt-in by default
     const currentAnalytics = settings?.user_consents_to_analytics ?? true;
-    setAnalyticsSwitchHasChanged(checked !== currentAnalytics);
+    setFieldChanged("analytics", checked !== currentAnalytics);
   };
 
   const checkIfSoundNotificationsSwitchHasChanged = (checked: boolean) => {
     const currentSoundNotifications = !!settings?.enable_sound_notifications;
-    setSoundNotificationsSwitchHasChanged(
+    setFieldChanged(
+      "soundNotifications",
       checked !== currentSoundNotifications,
     );
   };
@@ -167,14 +183,16 @@ function AppSettingsScreen() {
   const checkIfProactiveConversationsSwitchHasChanged = (checked: boolean) => {
     const currentProactiveConversations =
       !!settings?.enable_proactive_conversation_starters;
-    setProactiveConversationsSwitchHasChanged(
+    setFieldChanged(
+      "proactiveConversations",
       checked !== currentProactiveConversations,
     );
   };
 
   const checkIfSolvabilityAnalysisSwitchHasChanged = (checked: boolean) => {
     const currentSolvabilityAnalysis = !!settings?.enable_solvability_analysis;
-    setSolvabilityAnalysisSwitchHasChanged(
+    setFieldChanged(
+      "solvabilityAnalysis",
       checked !== currentSolvabilityAnalysis,
     );
   };
@@ -185,36 +203,40 @@ function AppSettingsScreen() {
     const currentStrategy =
       settings?.sandbox_grouping_strategy ||
       DEFAULT_SETTINGS.sandbox_grouping_strategy;
-    setSandboxGroupingStrategyHasChanged(newStrategy !== currentStrategy);
+    setFieldChanged("sandboxGroupingStrategy", newStrategy !== currentStrategy);
   };
 
   const checkIfMaxBudgetPerTaskHasChanged = (value: string) => {
     const newValue = parseMaxBudgetPerTask(value);
     const currentValue = settings?.max_budget_per_task;
-    setMaxBudgetPerTaskHasChanged(newValue !== currentValue);
+    setFieldChanged("maxBudgetPerTask", newValue !== currentValue);
   };
 
   const checkIfGitUserNameHasChanged = (value: string) => {
     const currentValue = settings?.git_user_name;
-    setGitUserNameHasChanged(value !== currentValue);
+    setFieldChanged("gitUserName", value !== currentValue);
   };
 
   const checkIfGitUserEmailHasChanged = (value: string) => {
     const currentValue = settings?.git_user_email;
-    setGitUserEmailHasChanged(value !== currentValue);
+    setFieldChanged("gitUserEmail", value !== currentValue);
   };
 
-  const formIsClean =
-    !languageInputHasChanged &&
-    !analyticsSwitchHasChanged &&
-    !soundNotificationsSwitchHasChanged &&
-    !proactiveConversationsSwitchHasChanged &&
-    !solvabilityAnalysisSwitchHasChanged &&
-    !sandboxGroupingStrategyHasChanged &&
-    !maxBudgetPerTaskHasChanged &&
-    !gitUserNameHasChanged &&
-    !gitUserEmailHasChanged;
+  const checkIfMarketplacePathHasChanged = (value: string) => {
+    const currentValue = settings?.marketplace_path ?? null;
+    const newValue = parseMarketplacePath(value);
+    setFieldChanged("marketplacePath", newValue !== currentValue);
 
+    if (!isValidMarketplacePath(value)) {
+      setMarketplacePathError(t(I18nKey.SETTINGS$MARKETPLACE_PATH_INVALID));
+      return;
+    }
+
+    setMarketplacePathError(null);
+  };
+
+  const formIsClean = changedFields.size === 0;
+  const hasValidationErrors = !!marketplacePathError;
   const shouldBeLoading = !settings || isLoading || isPending;
 
   return (
@@ -305,7 +327,7 @@ function AppSettingsScreen() {
               placeholder={t(I18nKey.SETTINGS$MAXIMUM_BUDGET_USD)}
               min={1}
               step={1}
-              className="w-full max-w-[680px]" // Match the width of the language field
+              className="w-full max-w-[680px]"
             />
           )}
 
@@ -339,6 +361,36 @@ function AppSettingsScreen() {
               />
             </div>
           </div>
+
+          <div className="border-t border-t-tertiary pt-6 mt-2">
+            <h3 className="text-lg font-medium mb-2">
+              {t(I18nKey.SETTINGS$SKILLS_SETTINGS)}
+            </h3>
+            <p className="text-xs mb-4">
+              {t(I18nKey.SETTINGS$SKILLS_SETTINGS_DESCRIPTION)}
+            </p>
+            <div className="flex flex-col gap-6">
+              <div>
+                <SettingsInput
+                  testId="marketplace-path-input"
+                  name="marketplace-path-input"
+                  type="text"
+                  label={t(I18nKey.SETTINGS$MARKETPLACE_PATH)}
+                  defaultValue={settings.marketplace_path || ""}
+                  onChange={checkIfMarketplacePathHasChanged}
+                  className="w-full max-w-[680px]"
+                />
+                {marketplacePathError && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {marketplacePathError}
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                {t(I18nKey.SETTINGS$MARKETPLACE_PATH_DESCRIPTION)}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -347,7 +399,7 @@ function AppSettingsScreen() {
           testId="submit-button"
           variant="primary"
           type="submit"
-          isDisabled={isPending || formIsClean}
+          isDisabled={isPending || formIsClean || hasValidationErrors}
         >
           {!isPending && t("SETTINGS$SAVE_CHANGES")}
           {isPending && t("SETTINGS$SAVING")}

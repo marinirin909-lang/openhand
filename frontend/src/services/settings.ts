@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   git_user_name: "openhands",
   git_user_email: "openhands@all-hands.dev",
   v1_enabled: false,
+  marketplace_path: null,
   sandbox_grouping_strategy: "NO_GROUPING",
 };
 

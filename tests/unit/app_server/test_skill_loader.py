@@ -393,6 +393,7 @@ class TestLoadSkillsFromAgentServer:
                 org_name='owner',
             ),
             sandbox_config=SandboxConfig(exposed_urls=[]),
+            marketplace_path='marketplaces/custom.json',
         )
 
         # Assert
@@ -404,6 +405,7 @@ class TestLoadSkillsFromAgentServer:
         assert call_args[0][0] == 'http://localhost:8000/api/skills'
         assert 'X-Session-API-Key' in call_args[1]['headers']
         assert call_args[1]['headers']['X-Session-API-Key'] == 'test-key'
+        assert call_args[1]['json']['marketplace_path'] == 'marketplaces/custom.json'
 
     @pytest.mark.asyncio
     @patch('httpx.AsyncClient')

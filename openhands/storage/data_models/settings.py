@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Annotated
 
 from pydantic import (
@@ -19,6 +21,8 @@ from openhands.core.config.mcp_config import MCPConfig
 from openhands.core.config.utils import load_openhands_config
 from openhands.storage.data_models.secrets import Secrets
 
+MARKETPLACE_PATH_PATTERN = re.compile(r'^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_.-]+)+\.json$')
+
 
 class SandboxGroupingStrategy(str, Enum):
     """Strategy for grouping conversations within sandboxes."""
@@ -35,7 +39,7 @@ class SandboxGroupingStrategy(str, Enum):
 
 
 class Settings(BaseModel):
-    """Persisted settings for OpenHands sessions"""
+    """Persisted settings for OpenHands sessions."""
 
     language: str | None = None
     agent: str | None = None
@@ -69,6 +73,7 @@ class Settings(BaseModel):
     git_user_name: str | None = None
     git_user_email: str | None = None
     v1_enabled: bool = True
+    marketplace_path: str | None = None
     sandbox_grouping_strategy: SandboxGroupingStrategy = (
         SandboxGroupingStrategy.NO_GROUPING
     )
@@ -76,6 +81,36 @@ class Settings(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
     )
+
+    @field_validator('marketplace_path', mode='before')
+    @classmethod
+    def validate_marketplace_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError('marketplace_path must be a string or null')
+
+        trimmed_value = value.strip()
+        if not trimmed_value:
+            return None
+
+        path = PurePosixPath(trimmed_value)
+        if (
+            path.is_absolute()
+            or ':' in trimmed_value
+            or '\\' in trimmed_value
+            or '..' in path.parts
+        ):
+            raise ValueError(
+                'marketplace_path must be a relative JSON path within the skills repository'
+            )
+
+        if not MARKETPLACE_PATH_PATTERN.fullmatch(trimmed_value):
+            raise ValueError(
+                'marketplace_path must match a relative path like marketplaces/default.json'
+            )
+
+        return trimmed_value
 
     @field_serializer('llm_api_key', 'search_api_key')
     def api_key_serializer(self, api_key: SecretStr | None, info: SerializationInfo):

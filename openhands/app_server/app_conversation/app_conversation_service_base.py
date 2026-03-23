@@ -130,6 +130,16 @@ class AppConversationServiceBase(AppConversationService, ABC):
             # Build sandbox config (exposed URLs)
             sandbox_config = build_sandbox_config(sandbox)
 
+            marketplace_path = None
+            try:
+                user_info = await self.user_context.get_user_info()
+                marketplace_path = user_info.marketplace_path
+            except NotImplementedError:
+                _logger.debug(
+                    'User context does not provide user settings; '
+                    'loading skills without marketplace_path override'
+                )
+
             # Single API call to agent-server for ALL skills
             all_skills = await load_skills_from_agent_server(
                 agent_server_url=agent_server_url,
@@ -141,6 +151,7 @@ class AppConversationServiceBase(AppConversationService, ABC):
                 load_user=True,
                 load_project=True,
                 load_org=True,
+                marketplace_path=marketplace_path,
             )
 
             _logger.info(
@@ -213,6 +224,7 @@ class AppConversationServiceBase(AppConversationService, ABC):
         """Load all skills and update agent with them.
 
         Args:
+            sandbox: Sandbox information, including the agent-server session key
             agent: The agent to update
             remote_workspace: AsyncRemoteWorkspace for loading repo skills
             selected_repository: Repository name or None (used for org config)
