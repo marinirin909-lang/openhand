@@ -43,8 +43,8 @@ from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands.sdk.workspace.remote.async_remote_workspace import AsyncRemoteWorkspace
 
 _logger = logging.getLogger(__name__)
-PRE_COMMIT_HOOK = '.git/hooks/pre-commit'
-PRE_COMMIT_LOCAL = '.git/hooks/pre-commit.local'
+PRE_COMMIT_HOOK = '/.git/hooks/pre-commit'
+PRE_COMMIT_LOCAL = '/.git/hooks/pre-commit.local'
 
 
 def get_project_dir(
