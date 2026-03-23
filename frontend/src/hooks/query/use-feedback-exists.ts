@@ -15,6 +15,7 @@ export const useFeedbackExists = (eventId?: number) => {
   const isV1Conversation = conversation?.conversation_version === "V1";
 
   return useQuery<FeedbackData>({
+    // eslint-disable-next-line @tanstack/query/exhaustive-deps -- queryClient is stable and doesn't need to be in the key
     queryKey: [...getFeedbackQueryKey(conversationId), eventId],
     queryFn: () => {
       if (!eventId) return { exists: false };
