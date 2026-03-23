@@ -180,6 +180,8 @@ def make_commit(
     issue_type: str,
     git_user_name: str = 'openhands',
     git_user_email: str = 'openhands@all-hands.dev',
+    commit_message_template: str | None = None,
+    commit_trailer: str | None = None,
 ) -> None:
     """Make a commit with the changes to the repository.
 
@@ -189,6 +191,11 @@ def make_commit(
         issue_type: The type of the issue
         git_user_name: Git username for commits
         git_user_email: Git email for commits
+        commit_message_template: Custom commit message template with variable substitution.
+            Supported variables: {issue_type}, {issue_number}, {issue_title}.
+            Defaults to 'Fix {issue_type} #{issue_number}: {issue_title}'.
+        commit_trailer: A string appended after a blank line in the commit body
+            (e.g. for signed-off-by lines, model info, CI metadata).
     """
     # Check if git username is set
     result = subprocess.run(
@@ -233,7 +240,17 @@ def make_commit(
         raise RuntimeError('ERROR: Openhands failed to make code changes.')
 
     # Prepare the commit message
-    commit_message = f'Fix {issue_type} #{issue.number}: {issue.title}'
+    if commit_message_template:
+        commit_message = commit_message_template.format(
+            issue_type=issue_type,
+            issue_number=issue.number,
+            issue_title=issue.title,
+        )
+    else:
+        commit_message = f'Fix {issue_type} #{issue.number}: {issue.title}'
+
+    if commit_trailer:
+        commit_message = f'{commit_message}\n\n{commit_trailer}'
 
     # Commit the changes
     result = subprocess.run(
@@ -621,6 +638,8 @@ def process_single_issue(
     base_domain: str | None = None,
     git_user_name: str = 'openhands',
     git_user_email: str = 'openhands@all-hands.dev',
+    commit_message_template: str | None = None,
+    commit_trailer: str | None = None,
 ) -> None:
     # Determine default base_domain based on platform
     if base_domain is None:
@@ -670,6 +689,8 @@ def process_single_issue(
         issue_type,
         git_user_name,
         git_user_email,
+        commit_message_template,
+        commit_trailer,
     )
 
     if issue_type == 'pr':
@@ -808,6 +829,21 @@ def main() -> None:
         default='openhands@all-hands.dev',
         help='Git user email for commits',
     )
+    parser.add_argument(
+        '--commit-message-template',
+        type=str,
+        default=None,
+        help='Custom commit message template with variable substitution. '
+        'Supported variables: {issue_type}, {issue_number}, {issue_title}. '
+        "Defaults to 'Fix {issue_type} #{issue_number}: {issue_title}'.",
+    )
+    parser.add_argument(
+        '--commit-trailer',
+        type=str,
+        default=None,
+        help='A string appended after a blank line in the commit body '
+        '(e.g. for signed-off-by lines, model info, CI metadata).',
+    )
     my_args = parser.parse_args()
 
     token = (
@@ -869,6 +905,8 @@ def main() -> None:
         my_args.base_domain,
         my_args.git_user_name,
         my_args.git_user_email,
+        my_args.commit_message_template,
+        my_args.commit_trailer,
     )
 
 
