@@ -10,6 +10,13 @@ from openhands.storage.data_models.settings import Settings
 from openhands.storage.settings.file_settings_store import FileSettingsStore
 
 
+def _mcp_config(settings: Settings) -> MCPConfig | None:
+    raw_mcp_config = settings.get_agent_setting('mcp_config')
+    if raw_mcp_config is None:
+        return None
+    return MCPConfig.model_validate(raw_mcp_config)
+
+
 @pytest.mark.asyncio
 async def test_user_auth_mcp_merging_integration():
     """Test that MCP merging works in the user auth flow."""
@@ -38,19 +45,23 @@ async def test_user_auth_mcp_merging_integration():
     with patch.object(
         user_auth, 'get_user_settings_store', return_value=mock_settings_store
     ):
-        with patch.object(Settings, 'from_config', return_value=config_settings):
+        with patch(
+            'openhands.storage.data_models.settings.Settings.from_config',
+            return_value=config_settings,
+        ):
             # Get user settings - this should trigger the merging
             merged_settings = await user_auth.get_user_settings()
 
     # Verify merging worked correctly
     assert merged_settings is not None
-    assert merged_settings.llm_model == 'gpt-4'
-    assert merged_settings.mcp_config is not None
-    assert len(merged_settings.mcp_config.sse_servers) == 2
+    merged_mcp_config = _mcp_config(merged_settings)
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'
+    assert merged_mcp_config is not None
+    assert len(merged_mcp_config.sse_servers) == 2
 
     # Config.toml server should come first (priority)
-    assert merged_settings.mcp_config.sse_servers[0].url == 'http://config-server.com'
-    assert merged_settings.mcp_config.sse_servers[1].url == 'http://frontend-server.com'
+    assert merged_mcp_config.sse_servers[0].url == 'http://config-server.com'
+    assert merged_mcp_config.sse_servers[1].url == 'http://frontend-server.com'
 
 
 @pytest.mark.asyncio
@@ -77,8 +88,9 @@ async def test_user_auth_caching_behavior():
     with patch.object(
         user_auth, 'get_user_settings_store', return_value=mock_settings_store
     ):
-        with patch.object(
-            Settings, 'from_config', return_value=config_settings
+        with patch(
+            'openhands.storage.data_models.settings.Settings.from_config',
+            return_value=config_settings,
         ) as mock_from_config:
             # First call should load and merge
             settings1 = await user_auth.get_user_settings()
@@ -88,7 +100,7 @@ async def test_user_auth_caching_behavior():
 
     # Verify both calls return the same merged settings
     assert settings1 is settings2
-    assert len(settings1.mcp_config.sse_servers) == 2
+    assert len(_mcp_config(settings1).sse_servers) == 2
 
     # Settings store should only be called once (first time)
     mock_settings_store.load.assert_called_once()

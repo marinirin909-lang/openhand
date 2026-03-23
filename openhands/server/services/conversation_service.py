@@ -104,22 +104,19 @@ async def start_conversation(
 
     session_init_args: dict[str, Any] = {}
     if settings:
-        session_init_args = {**settings.__dict__, **session_init_args}
-        # We could use litellm.check_valid_key for a more accurate check,
-        # but that would run a tiny inference.
-        model_name = settings.llm_model or ''
+        session_init_args = settings.model_dump()
+        agent_settings = settings.to_agent_settings()
+        model_name = agent_settings.llm.model
+        llm_api_key = agent_settings.llm.api_key
         is_bedrock_model = model_name.startswith('bedrock/')
         is_lemonade_model = model_name.startswith('lemonade/')
 
         if (
             not is_bedrock_model
             and not is_lemonade_model
-            and (
-                not settings.llm_api_key
-                or settings.llm_api_key.get_secret_value().isspace()
-            )
+            and (not llm_api_key or llm_api_key.get_secret_value().isspace())
         ):
-            logger.warning(f'Missing api key for model {settings.llm_model}')
+            logger.warning(f'Missing api key for model {model_name}')
             raise LLMAuthenticationError(
                 'Error authenticating with the LLM provider. Please check your API key'
             )
@@ -137,7 +134,9 @@ async def start_conversation(
     session_init_args['git_provider'] = conversation_metadata.git_provider
     session_init_args['conversation_instructions'] = conversation_instructions
     if mcp_config:
-        session_init_args['mcp_config'] = mcp_config
+        agent_settings_payload = dict(session_init_args.get('agent_settings') or {})
+        agent_settings_payload['mcp_config'] = mcp_config.model_dump(mode='python')
+        session_init_args['agent_settings'] = agent_settings_payload
 
     conversation_init_data = ConversationInitData(**session_init_args)
 
@@ -244,8 +243,7 @@ async def setup_init_conversation_settings(
             'Settings not found', {'msg_id': 'CONFIGURATION$SETTINGS_NOT_FOUND'}
         )
 
-    session_init_args: dict = {}
-    session_init_args = {**settings.__dict__, **session_init_args}
+    session_init_args: dict = settings.model_dump()
 
     # Use provided tokens if available (for SAAS resume), otherwise create scaffold
     if provider_tokens:

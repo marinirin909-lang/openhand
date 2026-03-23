@@ -1,0 +1,167 @@
+import React from "react";
+import { OptionalTag } from "#/components/features/settings/optional-tag";
+import { SettingsDropdownInput } from "#/components/features/settings/settings-dropdown-input";
+import { SettingsInput } from "#/components/features/settings/settings-input";
+import { SettingsSwitch } from "#/components/features/settings/settings-switch";
+import { SettingsFieldSchema } from "#/types/settings";
+import { HelpLink } from "#/ui/help-link";
+import { Typography } from "#/ui/typography";
+import { cn } from "#/utils/utils";
+
+// ---------------------------------------------------------------------------
+// Help links – UI-only mapping from field keys to user-facing guidance.
+// ---------------------------------------------------------------------------
+export const FIELD_HELP_LINKS: Record<
+  string,
+  { text: string; linkText: string; href: string }
+> = {
+  "llm.api_key": {
+    text: "Don't know your API key?",
+    linkText: "Click here for instructions.",
+    href: "https://docs.all-hands.dev/usage/local-setup#getting-an-api-key",
+  },
+};
+
+function FieldHelp({ field }: { field: SettingsFieldSchema }) {
+  const helpLink = FIELD_HELP_LINKS[field.key];
+
+  return (
+    <>
+      {field.description ? (
+        <Typography.Paragraph className="text-tertiary-alt text-xs leading-5">
+          {field.description}
+        </Typography.Paragraph>
+      ) : null}
+      {helpLink ? (
+        <HelpLink
+          testId={`help-link-${field.key}`}
+          text={helpLink.text}
+          linkText={helpLink.linkText}
+          href={helpLink.href}
+          size="settings"
+          linkColor="white"
+        />
+      ) : null}
+    </>
+  );
+}
+
+function isSelectField(field: SettingsFieldSchema): boolean {
+  return field.choices.length > 0;
+}
+
+function isBooleanField(field: SettingsFieldSchema): boolean {
+  return field.value_type === "boolean" && !isSelectField(field);
+}
+
+function isJsonField(field: SettingsFieldSchema): boolean {
+  return field.value_type === "array" || field.value_type === "object";
+}
+
+function getInputType(
+  field: SettingsFieldSchema,
+): React.HTMLInputTypeAttribute {
+  if (field.secret) {
+    return "password";
+  }
+  if (field.value_type === "integer" || field.value_type === "number") {
+    return "number";
+  }
+  return "text";
+}
+
+export function SchemaField({
+  field,
+  value,
+  isDisabled,
+  onChange,
+}: {
+  field: SettingsFieldSchema;
+  value: string | boolean;
+  isDisabled: boolean;
+  onChange: (value: string | boolean) => void;
+}) {
+  if (isBooleanField(field)) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <SettingsSwitch
+          testId={`sdk-settings-${field.key}`}
+          isToggled={Boolean(value)}
+          isDisabled={isDisabled}
+          onToggle={onChange}
+        >
+          {field.label}
+        </SettingsSwitch>
+        <FieldHelp field={field} />
+      </div>
+    );
+  }
+
+  if (isSelectField(field)) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <SettingsDropdownInput
+          testId={`sdk-settings-${field.key}`}
+          name={field.key}
+          label={field.label}
+          items={field.choices.map((choice) => ({
+            key: String(choice.value),
+            label: choice.label,
+          }))}
+          selectedKey={value === "" ? undefined : String(value)}
+          isClearable={!field.required}
+          required={field.required}
+          showOptionalTag={!field.required}
+          isDisabled={isDisabled}
+          onSelectionChange={(selectedKey) =>
+            onChange(String(selectedKey ?? ""))
+          }
+        />
+        <FieldHelp field={field} />
+      </div>
+    );
+  }
+
+  if (isJsonField(field)) {
+    return (
+      <label className="flex flex-col gap-2.5 w-full">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{field.label}</span>
+          {!field.required ? <OptionalTag /> : null}
+        </div>
+        <textarea
+          data-testid={`sdk-settings-${field.key}`}
+          name={field.key}
+          value={String(value ?? "")}
+          required={field.required}
+          disabled={isDisabled}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(
+            "bg-tertiary border border-[#717888] min-h-32 w-full rounded-sm p-2 font-mono text-sm",
+            "placeholder:italic placeholder:text-tertiary-alt",
+            "disabled:bg-[#2D2F36] disabled:border-[#2D2F36] disabled:cursor-not-allowed",
+          )}
+        />
+        <FieldHelp field={field} />
+      </label>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <SettingsInput
+        testId={`sdk-settings-${field.key}`}
+        name={field.key}
+        label={field.label}
+        type={getInputType(field)}
+        value={String(value ?? "")}
+        required={field.required}
+        showOptionalTag={!field.required}
+        isDisabled={isDisabled}
+        onChange={onChange}
+        className="w-full"
+      />
+      <FieldHelp field={field} />
+    </div>
+  );
+}

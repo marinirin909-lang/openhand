@@ -6,7 +6,8 @@
 # Unless you are working on deprecation, please avoid extending this legacy file and consult the V1 codepaths above.
 # Tag: Legacy-V0
 # This module belongs to the old V0 web server. The V1 application server lives under openhands/app_server/.
-import os
+import importlib
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
@@ -31,11 +32,94 @@ from openhands.server.user_auth import (
 from openhands.storage.data_models.settings import Settings
 from openhands.storage.secrets.secrets_store import SecretsStore
 from openhands.storage.settings.settings_store import SettingsStore
-from openhands.utils.llm import get_provider_api_base, is_openhands_model
 
-LITE_LLM_API_URL = os.environ.get(
-    'LITE_LLM_API_URL', 'https://llm-proxy.app.all-hands.dev'
+
+def _get_agent_settings_schema() -> dict[str, Any] | None:
+    """Return the SDK settings schema when the SDK package is installed."""
+    try:
+        settings_module = importlib.import_module('openhands.sdk.settings')
+    except ModuleNotFoundError:
+        return None
+
+    return settings_module.AgentSettings.export_schema().model_dump(mode='json')
+
+
+def _get_schema_field_keys(schema: dict[str, Any] | None) -> set[str]:
+    if not schema:
+        return set()
+    return {
+        field['key']
+        for section in schema.get('sections', [])
+        for field in section.get('fields', [])
+    }
+
+
+def _get_schema_secret_field_keys(schema: dict[str, Any] | None) -> set[str]:
+    if not schema:
+        return set()
+    return {
+        field['key']
+        for section in schema.get('sections', [])
+        for field in section.get('fields', [])
+        if field.get('secret')
+    }
+
+
+_SECRET_REDACTED = '<hidden>'
+
+
+def _extract_agent_settings(
+    settings: Settings, schema: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Build the agent_settings dict for the GET response.
+
+    Secret fields with a value are redacted to ``"<hidden>"``;
+    unset secrets become ``None``.
+    """
+    values = dict(settings.agent_settings)
+    for field_key in _get_schema_secret_field_keys(schema):
+        raw = values.get(field_key)
+        values[field_key] = _SECRET_REDACTED if raw else None
+    return values
+
+
+_SETTINGS_FROZEN_FIELDS = frozenset(
+    name for name, field_info in Settings.model_fields.items() if field_info.frozen
 )
+
+
+def _apply_settings_payload(
+    payload: dict[str, Any],
+    existing_settings: Settings | None,
+    agent_schema: dict[str, Any] | None,
+) -> Settings:
+    """Apply an incoming settings payload.
+
+    SDK dotted keys (e.g. ``llm.model``) go into ``agent_settings``.
+    Other keys (e.g. ``language``, ``git_user_name``) are set directly
+    on the ``Settings`` model.
+    """
+    settings = existing_settings.model_copy() if existing_settings else Settings()
+
+    schema_field_keys = _get_schema_field_keys(agent_schema)
+    secret_field_keys = _get_schema_secret_field_keys(agent_schema)
+    agent_settings = dict(settings.agent_settings)
+
+    for key, value in payload.items():
+        if key in schema_field_keys:
+            if key in secret_field_keys:
+                if value is not None and value != '' and value != _SECRET_REDACTED:
+                    agent_settings[key] = value
+            elif value is None:
+                agent_settings.pop(key, None)
+            else:
+                agent_settings[key] = value
+        elif key in Settings.model_fields and key not in _SETTINGS_FROZEN_FIELDS:
+            setattr(settings, key, value)
+
+    settings.agent_settings = agent_settings
+    return settings
+
 
 app = APIRouter(prefix='/api', dependencies=get_dependencies())
 
@@ -77,32 +161,25 @@ async def load_settings(
                 if provider_token.token or provider_token.user_id:
                     provider_tokens_set[provider_type] = provider_token.host
 
+        agent_settings_schema = _get_agent_settings_schema()
+        agent_vals = _extract_agent_settings(settings, agent_settings_schema)
+
         settings_with_token_data = GETSettingsModel(
-            **settings.model_dump(exclude={'secrets_store'}),
-            llm_api_key_set=settings.llm_api_key is not None
-            and bool(settings.llm_api_key),
+            **settings.model_dump(exclude={'secrets_store', 'agent_settings'}),
+            llm_api_key_set=settings.llm_api_key_is_set,
             search_api_key_set=settings.search_api_key is not None
             and bool(settings.search_api_key),
             provider_tokens_set=provider_tokens_set,
+            agent_settings_schema=agent_settings_schema,
+            agent_settings=agent_vals,
         )
 
-        # If the base url matches the default for the provider, we don't send it
-        # So that the frontend can display basic mode
-        if is_openhands_model(settings.llm_model):
-            if settings.llm_base_url == LITE_LLM_API_URL:
-                settings_with_token_data.llm_base_url = None
-        elif settings.llm_model and settings.llm_base_url == get_provider_api_base(
-            settings.llm_model
-        ):
-            settings_with_token_data.llm_base_url = None
-
-        settings_with_token_data.llm_api_key = None
+        # Redact secrets from the response.
         settings_with_token_data.search_api_key = None
         settings_with_token_data.sandbox_api_key = None
         return settings_with_token_data
     except Exception as e:
         logger.warning(f'Invalid token: {e}')
-        # Get user_id from settings if available
         user_id = getattr(settings, 'user_id', 'unknown') if settings else 'unknown'
         logger.info(
             f'Returning 401 Unauthorized - Invalid token for user_id: {user_id}'
@@ -111,47 +188,6 @@ async def load_settings(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={'error': 'Invalid token'},
         )
-
-
-async def store_llm_settings(
-    settings: Settings, existing_settings: Settings
-) -> Settings:
-    # Convert to Settings model and merge with existing settings
-    if existing_settings:
-        # Keep existing LLM settings if not provided
-        if settings.llm_api_key is None:
-            settings.llm_api_key = existing_settings.llm_api_key
-        if settings.llm_model is None:
-            settings.llm_model = existing_settings.llm_model
-        if settings.llm_base_url is None:
-            # Not provided at all (e.g. MCP config save) - preserve existing or auto-detect
-            if existing_settings.llm_base_url:
-                settings.llm_base_url = existing_settings.llm_base_url
-            elif is_openhands_model(settings.llm_model):
-                # OpenHands models use the LiteLLM proxy
-                settings.llm_base_url = LITE_LLM_API_URL
-            elif settings.llm_model:
-                # For non-openhands models, try to get URL from litellm
-                try:
-                    api_base = get_provider_api_base(settings.llm_model)
-                    if api_base:
-                        settings.llm_base_url = api_base
-                    else:
-                        logger.debug(
-                            f'No api_base found in litellm for model: {settings.llm_model}'
-                        )
-                except Exception as e:
-                    logger.error(
-                        f'Failed to get api_base from litellm for model {settings.llm_model}: {e}'
-                    )
-        elif settings.llm_base_url == '':
-            # Explicitly cleared by the user (basic view save or advanced view clear)
-            settings.llm_base_url = None
-        # Keep search API key if missing or empty
-        if not settings.search_api_key:
-            settings.search_api_key = existing_settings.search_api_key
-
-    return settings
 
 
 # NOTE: We use response_model=None for endpoints that return JSONResponse directly.
@@ -167,18 +203,19 @@ async def store_llm_settings(
     },
 )
 async def store_settings(
-    settings: Settings,
+    payload: dict[str, Any],
     settings_store: SettingsStore = Depends(get_user_settings_store),
 ) -> JSONResponse:
-    # Check provider tokens are valid
     try:
         existing_settings = await settings_store.load()
+        agent_settings_schema = _get_agent_settings_schema()
+        settings = _apply_settings_payload(
+            payload, existing_settings, agent_settings_schema
+        )
 
-        # Convert to Settings model and merge with existing settings
         if existing_settings:
-            settings = await store_llm_settings(settings, existing_settings)
-
-            # Keep existing analytics consent if not provided
+            if not settings.search_api_key:
+                settings.search_api_key = existing_settings.search_api_key
             if settings.user_consents_to_analytics is None:
                 settings.user_consents_to_analytics = (
                     existing_settings.user_consents_to_analytics
@@ -199,14 +236,11 @@ async def store_settings(
             config.git_user_email = settings.git_user_email
             git_config_updated = True
 
-        # Note: Git configuration will be applied when new sessions are initialized
-        # Existing sessions will continue with their current git configuration
         if git_config_updated:
             logger.info(
                 f'Updated global git configuration: name={config.git_user_name}, email={config.git_user_email}'
             )
 
-        settings = convert_to_settings(settings)
         await settings_store.store(settings)
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -218,22 +252,3 @@ async def store_settings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={'error': 'Something went wrong storing settings'},
         )
-
-
-def convert_to_settings(settings_with_token_data: Settings) -> Settings:
-    settings_data = settings_with_token_data.model_dump()
-
-    # Filter out additional fields from `SettingsWithTokenData`
-    filtered_settings_data = {
-        key: value
-        for key, value in settings_data.items()
-        if key in Settings.model_fields  # Ensures only `Settings` fields are included
-    }
-
-    # Convert the API keys to `SecretStr` instances
-    filtered_settings_data['llm_api_key'] = settings_with_token_data.llm_api_key
-    filtered_settings_data['search_api_key'] = settings_with_token_data.search_api_key
-
-    # Create a new Settings instance
-    settings = Settings(**filtered_settings_data)
-    return settings

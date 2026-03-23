@@ -13,11 +13,12 @@ def setup_llm_config(config: OpenHandsConfig, settings: Settings) -> OpenHandsCo
     # Copying this means that when we update variables they are not applied to the shared global configuration!
     config = deepcopy(config)
 
+    agent_settings = settings.to_agent_settings()
     llm_config = config.get_llm_config()
-    llm_config.model = settings.llm_model or ''
-    llm_config.api_key = settings.llm_api_key
+    llm_config.model = agent_settings.llm.model
+    llm_config.api_key = agent_settings.llm.api_key
     env_base_url = os.environ.get('LLM_BASE_URL')
-    settings_base_url = settings.llm_base_url
+    settings_base_url = agent_settings.llm.base_url
 
     # Use env_base_url if available, otherwise fall back to settings_base_url
     base_url_to_use = (
@@ -43,7 +44,7 @@ def create_registry_and_conversation_stats(
     if user_settings:
         user_config = setup_llm_config(config, user_settings)
 
-    agent_cls = user_settings.agent if user_settings else None
+    agent_cls = user_settings.to_agent_settings().agent if user_settings else None
     llm_registry = LLMRegistry(user_config, agent_cls)
     file_store = get_file_store(
         file_store_type=config.file_store,

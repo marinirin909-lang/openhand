@@ -20,7 +20,7 @@ from openhands.core.config.condenser_config import (
     ConversationWindowCondenserConfig,
     LLMSummarizingCondenserConfig,
 )
-from openhands.core.config.mcp_config import OpenHandsMCPConfigImpl
+from openhands.core.config.mcp_config import MCPConfig, OpenHandsMCPConfigImpl
 from openhands.core.exceptions import MicroagentValidationError
 from openhands.core.logger import OpenHandsLoggerAdapter
 from openhands.core.schema import AgentState
@@ -140,17 +140,11 @@ class WebSession:
             AgentStateChangedObservation('', AgentState.LOADING),
             EventSource.ENVIRONMENT,
         )
-        agent_cls = settings.agent or self.config.default_agent
-        self.config.security.confirmation_mode = (
-            self.config.security.confirmation_mode
-            if settings.confirmation_mode is None
-            else settings.confirmation_mode
-        )
-        self.config.security.security_analyzer = (
-            self.config.security.security_analyzer
-            if settings.security_analyzer is None
-            else settings.security_analyzer
-        )
+        agent_settings = settings.to_agent_settings()
+        agent_cls = agent_settings.agent or self.config.default_agent
+        verification_settings = agent_settings.verification
+        self.config.security.confirmation_mode = verification_settings.confirmation_mode
+        self.config.security.security_analyzer = verification_settings.security_analyzer
         self.config.sandbox.base_container_image = (
             settings.sandbox_base_container_image
             or self.config.sandbox.base_container_image
@@ -169,7 +163,9 @@ class WebSession:
         git_user_email = getattr(settings, 'git_user_email', None)
         if git_user_email is not None:
             self.config.git_user_email = git_user_email
-        max_iterations = settings.max_iterations or self.config.max_iterations
+        max_iterations = (
+            settings.agent_settings.get('max_iterations') or self.config.max_iterations
+        )
 
         # Prioritize settings over config for max_budget_per_task
         max_budget_per_task = (
@@ -187,12 +183,11 @@ class WebSession:
             f'MCP configuration before setup - self.config.mcp_config: {self.config.mcp}'
         )
 
-        # Check if settings has custom mcp_config
-        mcp_config = getattr(settings, 'mcp_config', None)
-        if mcp_config is not None:
-            # Use the provided MCP SHTTP servers instead of default setup
-            self.config.mcp = self.config.mcp.merge(mcp_config)
-            self.logger.debug(f'Merged custom MCP Config: {mcp_config}')
+        mcp_config = agent_settings.mcp_config
+        if mcp_config:
+            typed_mcp_config = MCPConfig.model_validate(mcp_config)
+            self.config.mcp = self.config.mcp.merge(typed_mcp_config)
+            self.logger.debug(f'Merged custom MCP Config: {typed_mcp_config}')
 
         # Add OpenHands' MCP server by default
         (
@@ -218,7 +213,8 @@ class WebSession:
         agent_config.runtime = self.config.runtime
         agent_name = agent_cls if agent_cls is not None else 'agent'
         llm_config = self.config.get_llm_config_from_agent(agent_name)
-        if settings.enable_default_condenser:
+        condenser_settings = agent_settings.condenser
+        if condenser_settings.enabled:
             # Default condenser chains three condensers together:
             # 1. a conversation window condenser that handles explicit
             # condensation requests,
@@ -228,7 +224,7 @@ class WebSession:
             # The order matters: with the browser output first, the summarizer
             # will only see the most recent browser output, which should keep
             # the summarization cost down.
-            max_events_for_condenser = settings.condenser_max_size or 240
+            max_events_for_condenser = condenser_settings.max_size
             default_condenser_config = CondenserPipelineConfig(
                 condensers=[
                     ConversationWindowCondenserConfig(),

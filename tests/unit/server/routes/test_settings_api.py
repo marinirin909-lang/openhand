@@ -8,6 +8,7 @@ from pydantic import SecretStr
 
 from openhands.integrations.provider import ProviderToken, ProviderType
 from openhands.server.app import app
+from openhands.server.routes import settings as settings_routes
 from openhands.server.user_auth.user_auth import UserAuth
 from openhands.storage.data_models.secrets import Secrets
 from openhands.storage.memory import InMemoryFileStore
@@ -17,7 +18,7 @@ from openhands.storage.settings.settings_store import SettingsStore
 
 
 class MockUserAuth(UserAuth):
-    """Mock implementation of UserAuth for testing"""
+    """Mock implementation of UserAuth for testing."""
 
     def __init__(self):
         self._settings = None
@@ -79,9 +80,108 @@ def test_client():
         yield client
 
 
+def test_get_agent_settings_schema_returns_none_when_sdk_missing():
+    with patch(
+        'openhands.server.routes.settings._get_agent_settings_schema',
+        return_value=None,
+    ) as mock_fn:
+        assert mock_fn() is None
+
+
+def test_get_agent_settings_schema_includes_verification_section():
+    schema = settings_routes._get_agent_settings_schema()
+    assert schema is not None
+    section_keys = [s['key'] for s in schema['sections']]
+    assert 'verification' in section_keys
+    section = next(s for s in schema['sections'] if s['key'] == 'verification')
+    field_keys = [f['key'] for f in section['fields']]
+    assert 'verification.confirmation_mode' in field_keys
+    assert 'verification.security_analyzer' in field_keys
+    assert 'verification.critic_enabled' in field_keys
+
+
 @pytest.mark.asyncio
 async def test_settings_api_endpoints(test_client):
-    """Test that the settings API endpoints work with the new auth system"""
+    """Test that the settings API endpoints work with the new auth system."""
+    agent_settings_schema = {
+        'model_name': 'AgentSettings',
+        'sections': [
+            {
+                'key': 'llm',
+                'label': 'LLM',
+                'fields': [
+                    {
+                        'key': 'llm.model',
+                        'value_type': 'string',
+                        'prominence': 'critical',
+                    },
+                    {
+                        'key': 'llm.base_url',
+                        'value_type': 'string',
+                        'prominence': 'major',
+                    },
+                    {
+                        'key': 'llm.timeout',
+                        'value_type': 'integer',
+                        'prominence': 'minor',
+                    },
+                    {
+                        'key': 'llm.litellm_extra_body',
+                        'value_type': 'object',
+                        'prominence': 'minor',
+                    },
+                    {
+                        'key': 'llm.api_key',
+                        'value_type': 'string',
+                        'prominence': 'critical',
+                        'secret': True,
+                    },
+                ],
+            },
+            {
+                'key': 'verification',
+                'label': 'Verification',
+                'fields': [
+                    {
+                        'key': 'verification.critic_enabled',
+                        'value_type': 'boolean',
+                        'prominence': 'critical',
+                    },
+                    {
+                        'key': 'verification.critic_mode',
+                        'value_type': 'string',
+                        'prominence': 'minor',
+                    },
+                    {
+                        'key': 'verification.enable_iterative_refinement',
+                        'value_type': 'boolean',
+                        'prominence': 'major',
+                    },
+                    {
+                        'key': 'verification.critic_threshold',
+                        'value_type': 'number',
+                        'prominence': 'minor',
+                    },
+                    {
+                        'key': 'verification.max_refinement_iterations',
+                        'value_type': 'integer',
+                        'prominence': 'minor',
+                    },
+                    {
+                        'key': 'verification.confirmation_mode',
+                        'value_type': 'boolean',
+                        'prominence': 'major',
+                    },
+                    {
+                        'key': 'verification.security_analyzer',
+                        'value_type': 'string',
+                        'prominence': 'major',
+                    },
+                ],
+            },
+        ],
+    }
+
     # Test data with remote_runtime_resource_factor
     settings_data = {
         'language': 'en',
@@ -89,44 +189,109 @@ async def test_settings_api_endpoints(test_client):
         'max_iterations': 100,
         'security_analyzer': 'default',
         'confirmation_mode': True,
-        'llm_model': 'test-model',
-        'llm_api_key': 'test-key',
-        'llm_base_url': 'https://test.com',
+        'llm.model': 'test-model',
+        'llm.api_key': 'test-key',
+        'llm.base_url': 'https://test.com',
+        'llm.timeout': 123,
+        'llm.litellm_extra_body': {'metadata': {'tier': 'pro'}},
         'remote_runtime_resource_factor': 2,
+        'verification.critic_enabled': True,
+        'verification.critic_mode': 'all_actions',
+        'verification.enable_iterative_refinement': True,
+        'verification.critic_threshold': 0.7,
+        'verification.max_refinement_iterations': 4,
+        'verification.confirmation_mode': True,
+        'verification.security_analyzer': 'llm',
     }
 
-    # Make the POST request to store settings
+    with patch(
+        'openhands.server.routes.settings._get_agent_settings_schema',
+        return_value=agent_settings_schema,
+    ):
+        # Make the POST request to store settings
+        response = test_client.post('/api/settings', json=settings_data)
+
+        # We're not checking the exact response, just that it doesn't error
+        assert response.status_code == 200
+
+        # Test the GET settings endpoint
+        response = test_client.get('/api/settings')
+        assert response.status_code == 200
+        response_data = response.json()
+        schema = response_data['agent_settings_schema']
+        assert schema['model_name'] == 'AgentSettings'
+        assert isinstance(schema['sections'], list)
+        assert [section['key'] for section in schema['sections']] == [
+            'llm',
+            'verification',
+        ]
+        llm_section, verification_section = schema['sections']
+        assert llm_section['label'] == 'LLM'
+        assert [field['key'] for field in llm_section['fields']] == [
+            'llm.model',
+            'llm.base_url',
+            'llm.timeout',
+            'llm.litellm_extra_body',
+            'llm.api_key',
+        ]
+        assert llm_section['fields'][-1]['secret'] is True
+        assert llm_section['fields'][2]['value_type'] == 'integer'
+        assert llm_section['fields'][3]['value_type'] == 'object'
+        assert verification_section['label'] == 'Verification'
+        vals = response_data['agent_settings']
+        assert vals['llm.model'] == 'test-model'
+        assert vals['llm.timeout'] == 123
+        assert vals['llm.litellm_extra_body'] == {'metadata': {'tier': 'pro'}}
+        assert vals['verification.critic_enabled'] is True
+        assert vals['verification.critic_mode'] == 'all_actions'
+        assert vals['verification.enable_iterative_refinement'] is True
+        assert vals['verification.critic_threshold'] == 0.7
+        assert vals['verification.max_refinement_iterations'] == 4
+        assert vals['verification.confirmation_mode'] is True
+        assert vals['verification.security_analyzer'] == 'llm'
+        assert vals['llm.api_key'] == '<hidden>'
+
+        # Test updating with partial settings
+        partial_settings = {
+            'language': 'fr',
+            'llm_model': None,  # Should preserve existing value
+            'llm_api_key': None,  # Should preserve existing value
+        }
+
+        response = test_client.post('/api/settings', json=partial_settings)
+        assert response.status_code == 200
+
+        response = test_client.get('/api/settings')
+        assert response.status_code == 200
+        assert response.json()['agent_settings']['llm.timeout'] == 123
+
+        # Test the unset-provider-tokens endpoint
+        response = test_client.post('/api/unset-provider-tokens')
+        assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_saving_settings_with_frozen_secrets_store(test_client):
+    """Regression: POSTing settings must not fail when the payload includes
+    ``secrets_store`` (a frozen field on the Settings model).
+    See https://github.com/OpenHands/OpenHands/issues/13306.
+    """
+    settings_data = {
+        'language': 'en',
+        'llm.model': 'gpt-4',
+        'secrets_store': {'provider_tokens': {}},
+    }
     response = test_client.post('/api/settings', json=settings_data)
-
-    # We're not checking the exact response, just that it doesn't error
-    assert response.status_code == 200
-
-    # Test the GET settings endpoint
-    response = test_client.get('/api/settings')
-    assert response.status_code == 200
-
-    # Test updating with partial settings
-    partial_settings = {
-        'language': 'fr',
-        'llm_model': None,  # Should preserve existing value
-        'llm_api_key': None,  # Should preserve existing value
-    }
-
-    response = test_client.post('/api/settings', json=partial_settings)
-    assert response.status_code == 200
-
-    # Test the unset-provider-tokens endpoint
-    response = test_client.post('/api/unset-provider-tokens')
     assert response.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_search_api_key_preservation(test_client):
-    """Test that search_api_key is preserved when sending empty string"""
-    # 1. Set initial settings with a search API key
+    """Test that search_api_key is preserved when sending an empty string."""
+    # 1. Set initial settings with a search API key (use SDK dotted keys)
     initial_settings = {
         'search_api_key': 'initial-secret-key',
-        'llm_model': 'gpt-4',
+        'llm.model': 'gpt-4',
     }
     response = test_client.post('/api/settings', json=initial_settings)
     assert response.status_code == 200
@@ -137,10 +302,10 @@ async def test_search_api_key_preservation(test_client):
     assert response.json()['search_api_key_set'] is True
 
     # 2. Update settings with EMPTY search API key (simulating the frontend bug)
-    # and changing another field (llm_model)
+    # and changing another field via SDK key
     update_settings = {
-        'search_api_key': '',  # The frontend sends an empty string here
-        'llm_model': 'claude-3-opus',
+        'search_api_key': '',
+        'llm.model': 'claude-3-opus',
     }
     response = test_client.post('/api/settings', json=update_settings)
     assert response.status_code == 200
@@ -148,7 +313,6 @@ async def test_search_api_key_preservation(test_client):
     # 3. Verify the key was NOT wiped out (The Critical Check)
     response = test_client.get('/api/settings')
     assert response.status_code == 200
-    # If the bug was present, this would be False
     assert response.json()['search_api_key_set'] is True
-    # Verify the other field updated correctly
-    assert response.json()['llm_model'] == 'claude-3-opus'
+    # Verify the SDK value updated
+    assert response.json()['agent_settings']['llm.model'] == 'claude-3-opus'

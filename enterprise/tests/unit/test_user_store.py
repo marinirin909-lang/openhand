@@ -97,8 +97,11 @@ async def test_create_default_settings_with_litellm(mock_litellm_api):
 
     # With mock, should return settings with API key from LiteLLM
     assert settings is not None
-    assert settings.llm_api_key.get_secret_value() == 'test_api_key'
-    assert settings.llm_base_url == 'http://test.url'
+    assert (
+        settings.get_secret_agent_setting('llm.api_key').get_secret_value()
+        == 'test_api_key'
+    )
+    assert settings.get_agent_setting('llm.base_url') == 'http://test.url'
 
 
 @pytest.mark.asyncio
@@ -688,8 +691,10 @@ def test_has_custom_settings_custom_base_url():
 
     user_settings = UserSettings(
         keycloak_user_id='test',
-        llm_base_url='https://custom.api.example.com',
-        llm_model='some-model',
+        agent_settings={
+            'llm.base_url': 'https://custom.api.example.com',
+            'llm.model': 'some-model',
+        },
     )
 
     result = UserStore._has_custom_settings(user_settings, old_user_version=1)
@@ -701,11 +706,7 @@ def test_has_custom_settings_no_model():
     """Test that no model set means using defaults."""
     from storage.user_settings import UserSettings
 
-    user_settings = UserSettings(
-        keycloak_user_id='test',
-        llm_base_url=None,
-        llm_model=None,
-    )
+    user_settings = UserSettings(keycloak_user_id='test', agent_settings={})
 
     result = UserStore._has_custom_settings(user_settings, old_user_version=1)
 
@@ -718,8 +719,7 @@ def test_has_custom_settings_empty_model():
 
     user_settings = UserSettings(
         keycloak_user_id='test',
-        llm_base_url=None,
-        llm_model='   ',  # whitespace only
+        agent_settings={'llm.model': '   '},
     )
 
     result = UserStore._has_custom_settings(user_settings, old_user_version=1)
@@ -764,6 +764,11 @@ def test_create_user_settings_from_entities():
     org.sandbox_runtime_container_image = None
     org.org_version = 1
     org.mcp_config = None
+    org.agent_settings = {
+        'schema_version': 1,
+        'agent': 'CodeActAgent',
+        'verification.security_analyzer': 'mock-analyzer',
+    }
     org.search_api_key = None
     org.sandbox_api_key = None
     org.max_budget_per_task = None
@@ -780,7 +785,11 @@ def test_create_user_settings_from_entities():
 
     assert result.keycloak_user_id == user_id
     assert result.llm_api_key == 'test-api-key'
-    assert result.llm_model == 'claude-3-5-sonnet'
+    assert result.agent_settings['llm.model'] == 'claude-3-5-sonnet'
+    assert result.agent_settings['llm.base_url'] == 'https://api.example.com'
+    assert result.agent_settings['max_iterations'] == 50
+    assert result.agent_settings['agent'] == 'CodeActAgent'
+    assert result.agent_settings['verification.security_analyzer'] == 'mock-analyzer'
     assert result.language == 'en'
     assert result.email == 'test@example.com'
 
@@ -819,6 +828,17 @@ def test_create_user_settings_from_entities_with_org_fallback():
     org.sandbox_runtime_container_image = None
     org.org_version = 2
     org.mcp_config = {'key': 'value'}
+    org.agent_settings = {
+        'schema_version': 1,
+        'agent': 'CodeActAgent',
+        'llm.model': 'default-model',
+        'llm.base_url': 'https://default.api.com',
+        'verification.confirmation_mode': True,
+        'condenser.enabled': False,
+        'condenser.max_size': 1000,
+        'max_iterations': 100,
+        'mcp_config': {'key': 'value'},
+    }
     org.search_api_key = SecretStr('search-key')
     org.sandbox_api_key = None
     org.max_budget_per_task = 10.0
@@ -835,9 +855,12 @@ def test_create_user_settings_from_entities_with_org_fallback():
     )
 
     # Should have fallen back to org defaults
-    assert result.llm_model == 'default-model'
-    assert result.llm_base_url == 'https://default.api.com'
-    assert result.max_iterations == 100
+    assert result.agent_settings['llm.model'] == 'default-model'
+    assert result.agent_settings['llm.base_url'] == 'https://default.api.com'
+    assert result.agent_settings['max_iterations'] == 100
+    assert result.agent_settings['agent'] == 'CodeActAgent'
+    assert result.agent_settings['verification.confirmation_mode'] is True
+    assert result.agent_settings['condenser.max_size'] == 1000
     assert result.language == 'es'
     assert result.search_api_key == 'search-key'
 

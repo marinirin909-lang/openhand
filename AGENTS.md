@@ -1,6 +1,24 @@
 This repository contains the code for OpenHands, an automated AI software engineer. It has a Python backend
 (in the `openhands` directory) and React frontend (in the `frontend` directory).
 
+
+## Repository Memory
+- Legacy `/api/settings` responses can bridge to the SDK by returning `sdk_settings_schema` from `openhands.sdk.settings` when that package is available. Use this as the compatibility handoff while V1 settings work moves into the SDK and newer clients.
+- The legacy LLM settings screen now renders SDK-backed sections from `sdk_settings_schema` and reads/writes values through the generic settings blob. The canonical backend field is `agent_settings`; `sdk_settings_values` is a compatibility alias for older callers.
+- In enterprise mode, persist the generic SDK settings blob in `agent_settings` on `enterprise/storage/org_member.py` and `enterprise/storage/user_settings.py`. Keep a `sdk_settings_values` alias only for compatibility with older tests/callers.
+- Persisted SaaS `agent_settings` should carry a `schema_version` and canonical dotted keys, but should not duplicate secret SDK values like `llm.api_key` in plaintext JSON. Reconstruct those from encrypted legacy columns on load, and backfill/migrate rows on read/write.
+- Enterprise org defaults should now be persisted canonically in `enterprise/storage/org.py:agent_settings` as well. Keep projection columns like `default_llm_model`, `default_llm_base_url`, `default_max_iterations`, `agent`, and verification/condenser fields synchronized from that blob for legacy queries/routes, but avoid duplicating org defaults onto `OrgMember.agent_settings` unless a member actually overrides them.
+
+- The frontend settings query still normalizes canonical backend fields (`agent_settings`, `agent_settings_schema`) back into legacy `sdk_settings_values` / `sdk_settings_schema` for existing settings screens. Strip both canonical and legacy schema/value blobs from save payloads so redacted GET metadata is never POSTed back.
+
+- The SDK settings schema now uses neutral metadata (`value_type`, `prominence`, `choices`, `depends_on`) instead of legacy UI-only fields like `widget`, `advanced`, or `placeholder`. Frontend helpers should derive control types from `value_type`/`choices`, and dotted `sdk_settings_values` may include structured JSON objects/arrays.
+- The SDK is now the source of truth for `openhands/*` runtime LLM defaults. In current pinned SDK builds, `AgentSettings.llm.base_url` resolves to the SDK-managed proxy URL, so tests and runtime adapters should not assume OpenHands still overrides this with `openhands_provider_base_url` or a legacy user `llm_base_url` field.
+- Enterprise persistence helpers (`OrgStore`, `OrgMemberStore`, `UserStore`, `SaasSettingsStore`, `LiteLlmManager`) should read SDK-owned settings through `to_agent_settings()`, `get_agent_setting(...)`, `get_secret_agent_setting(...)`, and `set_agent_setting(...)` instead of accessing removed flat `Settings` attributes like `llm_model`, `llm_base_url`, `llm_api_key`, or `agent`.
+- SDK `AgentSettings` sections are: `llm`, `condenser`, `verification`. The `verification` section merges former `critic` + `security` settings into one `VerificationSettings` model. Backward-compat property accessors (`.critic`, `.security`, `.enabled`, `.mode`, `.threshold`) and type aliases (`CriticSettings`, `SecuritySettings`) are preserved. Do NOT subclass `AgentSettings` in OpenHands — use it directly.
+
+
+
+
 ## General Setup:
 To set up the entire repo, including frontend and backend, run `make build`.
 You don't need to do this unless the user asks you to, or if you're trying to run the entire application.

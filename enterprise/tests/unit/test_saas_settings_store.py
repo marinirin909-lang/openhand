@@ -8,6 +8,16 @@ from openhands.core.config.openhands_config import OpenHandsConfig
 from openhands.server.settings import Settings
 from openhands.storage.data_models.settings import Settings as DataSettings
 
+
+def _agent_value(settings: Settings, key: str):
+    return settings.get_agent_setting(key)
+
+
+def _secret_value(settings: Settings, key: str):
+    secret = settings.get_secret_agent_setting(key)
+    return secret.get_secret_value() if secret else None
+
+
 # Mock the database module before importing
 with patch('storage.database.a_session_maker'):
     from server.constants import (
@@ -24,6 +34,29 @@ def mock_config():
     config.file_store = 'google_cloud'
     config.file_store_path = 'bucket'
     return config
+
+
+def test_member_scoped_agent_settings_filters_effective_settings(mock_config):
+    store = SaasSettingsStore('test-user-id', mock_config)
+    effective_settings = Settings(
+        agent='CodeActAgent',
+        llm_model='anthropic/claude-sonnet-4-5-20250929',
+        llm_base_url='https://api.example.com',
+        max_iterations=42,
+        confirmation_mode=True,
+        security_analyzer='llm',
+        enable_default_condenser=False,
+        condenser_max_size=128,
+    )
+
+    assert store._member_scoped_agent_settings(
+        effective_settings.normalized_agent_settings(strip_secret_values=True)
+    ) == {
+        'schema_version': 1,
+        'llm.model': 'anthropic/claude-sonnet-4-5-20250929',
+        'llm.base_url': 'https://api.example.com',
+        'max_iterations': 42,
+    }
 
 
 @pytest.fixture
@@ -79,6 +112,7 @@ def settings_store(async_session_maker, mock_config):
 
             # Encrypt the data before storing
             store._encrypt_kwargs(item_dict)
+            item_dict['agent_settings'] = item.agent_settings
 
             # Continue with the original implementation
             from sqlalchemy import select
@@ -119,6 +153,10 @@ async def test_store_and_load_keycloak_user(settings_store):
         agent='smith',
         email='test@example.com',
         email_verified=True,
+        agent_settings={
+            'verification.critic_mode': 'all_actions',
+            'verification.critic_enabled': True,
+        },
     )
 
     await settings_store.store(settings)
@@ -126,8 +164,10 @@ async def test_store_and_load_keycloak_user(settings_store):
     # Load and verify settings
     loaded_settings = await settings_store.load()
     assert loaded_settings is not None
-    assert loaded_settings.llm_api_key.get_secret_value() == 'secret_key'
-    assert loaded_settings.agent == 'smith'
+    assert loaded_settings.agent_settings['verification.critic_mode'] == 'all_actions'
+    assert loaded_settings.agent_settings['verification.critic_enabled'] is True
+    assert _secret_value(loaded_settings, 'llm.api_key') == 'secret_key'
+    assert _agent_value(loaded_settings, 'agent') == 'smith'
 
     # Verify it was stored in user_settings table with keycloak_user_id
     from sqlalchemy import select
@@ -140,7 +180,7 @@ async def test_store_and_load_keycloak_user(settings_store):
         )
         stored = result.scalars().first()
         assert stored is not None
-        assert stored.agent == 'smith'
+        assert stored.agent_settings['agent'] == 'smith'
 
 
 @pytest.mark.asyncio
@@ -154,9 +194,9 @@ async def test_load_returns_default_when_not_found(settings_store, async_session
         loaded_settings = await settings_store.load()
         assert loaded_settings is not None
         assert loaded_settings.language == 'en'
-        assert loaded_settings.agent == 'CodeActAgent'
-        assert loaded_settings.llm_api_key.get_secret_value() == 'test_api_key'
-        assert loaded_settings.llm_base_url == 'http://test.url'
+        assert _agent_value(loaded_settings, 'agent') == 'CodeActAgent'
+        assert _secret_value(loaded_settings, 'llm.api_key') == 'test_api_key'
+        assert _agent_value(loaded_settings, 'llm.base_url') == 'http://test.url'
 
 
 @pytest.mark.asyncio
@@ -183,7 +223,7 @@ async def test_encryption(settings_store):
         assert stored.llm_api_key != 'secret_key'
         # But we should be able to decrypt it when loading
         loaded_settings = await settings_store.load()
-        assert loaded_settings.llm_api_key.get_secret_value() == 'secret_key'
+        assert _secret_value(loaded_settings, 'llm.api_key') == 'secret_key'
 
 
 @pytest.mark.asyncio
@@ -203,8 +243,8 @@ async def test_ensure_api_key_keeps_valid_key(mock_config):
         await store._ensure_api_key(item, 'org-123', openhands_type=True)
 
         # Key should remain unchanged when it's valid
-        assert item.llm_api_key is not None
-        assert item.llm_api_key.get_secret_value() == existing_key
+        assert _secret_value(item, 'llm.api_key') is not None
+        assert _secret_value(item, 'llm.api_key') == existing_key
 
 
 @pytest.mark.asyncio
@@ -232,8 +272,8 @@ async def test_ensure_api_key_generates_new_key_when_verification_fails(
     ):
         await store._ensure_api_key(item, 'org-123', openhands_type=True)
 
-        assert item.llm_api_key is not None
-        assert item.llm_api_key.get_secret_value() == new_key
+        assert _secret_value(item, 'llm.api_key') is not None
+        assert _secret_value(item, 'llm.api_key') == new_key
 
 
 @pytest.fixture
@@ -437,3 +477,6 @@ async def test_store_updates_org_default_llm_settings(
         assert org.default_llm_model == 'anthropic/claude-sonnet-4'
         assert org.default_llm_base_url == 'https://api.anthropic.com/v1'
         assert org.default_max_iterations == 75
+        assert org.agent_settings['llm.model'] == 'anthropic/claude-sonnet-4'
+        assert org.agent_settings['llm.base_url'] == 'https://api.anthropic.com/v1'
+        assert org.agent_settings['max_iterations'] == 75

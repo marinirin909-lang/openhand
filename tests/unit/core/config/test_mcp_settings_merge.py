@@ -12,6 +12,13 @@ from openhands.core.config.mcp_config import (
 from openhands.storage.data_models.settings import Settings
 
 
+def _mcp_config(settings: Settings) -> MCPConfig | None:
+    raw_mcp_config = settings.get_agent_setting('mcp_config')
+    if raw_mcp_config is None:
+        return None
+    return MCPConfig.model_validate(raw_mcp_config)
+
+
 @pytest.mark.asyncio
 async def test_mcp_settings_merge_config_only():
     """Test merging when only config.toml has MCP settings."""
@@ -25,14 +32,18 @@ async def test_mcp_settings_merge_config_only():
     # Frontend settings without MCP config
     frontend_settings = Settings(llm_model='gpt-4')
 
-    with patch.object(Settings, 'from_config', return_value=mock_config_settings):
+    with patch(
+        'openhands.storage.data_models.settings.Settings.from_config',
+        return_value=mock_config_settings,
+    ):
         merged_settings = frontend_settings.merge_with_config_settings()
 
     # Should use config.toml MCP settings
-    assert merged_settings.mcp_config is not None
-    assert len(merged_settings.mcp_config.sse_servers) == 1
-    assert merged_settings.mcp_config.sse_servers[0].url == 'http://config-server.com'
-    assert merged_settings.llm_model == 'gpt-4'
+    merged_mcp_config = _mcp_config(merged_settings)
+    assert merged_mcp_config is not None
+    assert len(merged_mcp_config.sse_servers) == 1
+    assert merged_mcp_config.sse_servers[0].url == 'http://config-server.com'
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'
 
 
 @pytest.mark.asyncio
@@ -49,14 +60,18 @@ async def test_mcp_settings_merge_frontend_only():
         ),
     )
 
-    with patch.object(Settings, 'from_config', return_value=mock_config_settings):
+    with patch(
+        'openhands.storage.data_models.settings.Settings.from_config',
+        return_value=mock_config_settings,
+    ):
         merged_settings = frontend_settings.merge_with_config_settings()
 
     # Should keep frontend MCP settings
-    assert merged_settings.mcp_config is not None
-    assert len(merged_settings.mcp_config.sse_servers) == 1
-    assert merged_settings.mcp_config.sse_servers[0].url == 'http://frontend-server.com'
-    assert merged_settings.llm_model == 'gpt-4'
+    merged_mcp_config = _mcp_config(merged_settings)
+    assert merged_mcp_config is not None
+    assert len(merged_mcp_config.sse_servers) == 1
+    assert merged_mcp_config.sse_servers[0].url == 'http://frontend-server.com'
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'
 
 
 @pytest.mark.asyncio
@@ -87,20 +102,24 @@ async def test_mcp_settings_merge_both_present():
         ),
     )
 
-    with patch.object(Settings, 'from_config', return_value=mock_config_settings):
+    with patch(
+        'openhands.storage.data_models.settings.Settings.from_config',
+        return_value=mock_config_settings,
+    ):
         merged_settings = frontend_settings.merge_with_config_settings()
 
     # Should merge both with config.toml taking priority (appearing first)
-    assert merged_settings.mcp_config is not None
-    assert len(merged_settings.mcp_config.sse_servers) == 2
-    assert merged_settings.mcp_config.sse_servers[0].url == 'http://config-server.com'
-    assert merged_settings.mcp_config.sse_servers[1].url == 'http://frontend-server.com'
+    merged_mcp_config = _mcp_config(merged_settings)
+    assert merged_mcp_config is not None
+    assert len(merged_mcp_config.sse_servers) == 2
+    assert merged_mcp_config.sse_servers[0].url == 'http://config-server.com'
+    assert merged_mcp_config.sse_servers[1].url == 'http://frontend-server.com'
 
-    assert len(merged_settings.mcp_config.stdio_servers) == 2
-    assert merged_settings.mcp_config.stdio_servers[0].name == 'config-stdio'
-    assert merged_settings.mcp_config.stdio_servers[1].name == 'frontend-stdio'
+    assert len(merged_mcp_config.stdio_servers) == 2
+    assert merged_mcp_config.stdio_servers[0].name == 'config-stdio'
+    assert merged_mcp_config.stdio_servers[1].name == 'frontend-stdio'
 
-    assert merged_settings.llm_model == 'gpt-4'
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'
 
 
 @pytest.mark.asyncio
@@ -117,14 +136,18 @@ async def test_mcp_settings_merge_no_config():
         ),
     )
 
-    with patch.object(Settings, 'from_config', return_value=mock_config_settings):
+    with patch(
+        'openhands.storage.data_models.settings.Settings.from_config',
+        return_value=mock_config_settings,
+    ):
         merged_settings = frontend_settings.merge_with_config_settings()
 
     # Should keep frontend settings unchanged
-    assert merged_settings.mcp_config is not None
-    assert len(merged_settings.mcp_config.sse_servers) == 1
-    assert merged_settings.mcp_config.sse_servers[0].url == 'http://frontend-server.com'
-    assert merged_settings.llm_model == 'gpt-4'
+    merged_mcp_config = _mcp_config(merged_settings)
+    assert merged_mcp_config is not None
+    assert len(merged_mcp_config.sse_servers) == 1
+    assert merged_mcp_config.sse_servers[0].url == 'http://frontend-server.com'
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'
 
 
 @pytest.mark.asyncio
@@ -136,9 +159,12 @@ async def test_mcp_settings_merge_neither_present():
     # Frontend settings without MCP config
     frontend_settings = Settings(llm_model='gpt-4')
 
-    with patch.object(Settings, 'from_config', return_value=mock_config_settings):
+    with patch(
+        'openhands.storage.data_models.settings.Settings.from_config',
+        return_value=mock_config_settings,
+    ):
         merged_settings = frontend_settings.merge_with_config_settings()
 
     # Should keep frontend settings unchanged
-    assert merged_settings.mcp_config is None
-    assert merged_settings.llm_model == 'gpt-4'
+    assert _mcp_config(merged_settings) is None
+    assert merged_settings.get_agent_setting('llm.model') == 'gpt-4'

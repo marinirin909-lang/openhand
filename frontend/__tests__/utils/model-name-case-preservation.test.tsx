@@ -13,7 +13,7 @@ describe("Model name case preservation", () => {
     const settings = extractSettings(formData);
 
     // Test that model names maintain their original casing
-    expect(settings.llm_model).toBe("SambaNova/Meta-Llama-3.1-8B-Instruct");
+    expect(settings["llm.model"]).toBe("SambaNova/Meta-Llama-3.1-8B-Instruct");
   });
 
   it("should preserve openai model case", () => {
@@ -24,7 +24,7 @@ describe("Model name case preservation", () => {
     formData.set("language", "en");
 
     const settings = extractSettings(formData);
-    expect(settings.llm_model).toBe("openai/gpt-4o");
+    expect(settings["llm.model"]).toBe("openai/gpt-4o");
   });
 
   it("should preserve anthropic model case", () => {
@@ -35,7 +35,7 @@ describe("Model name case preservation", () => {
     formData.set("language", "en");
 
     const settings = extractSettings(formData);
-    expect(settings.llm_model).toBe("anthropic/claude-sonnet-4-20250514");
+    expect(settings["llm.model"]).toBe("anthropic/claude-sonnet-4-20250514");
   });
 
   it("should not automatically lowercase model names", () => {
@@ -48,7 +48,9 @@ describe("Model name case preservation", () => {
     const settings = extractSettings(formData);
 
     // Test that camelCase and PascalCase are preserved
-    expect(settings.llm_model).not.toBe("sambanova/meta-llama-3.1-8b-instruct");
-    expect(settings.llm_model).toBe("SambaNova/Meta-Llama-3.1-8B-Instruct");
+    expect(settings["llm.model"]).not.toBe(
+      "sambanova/meta-llama-3.1-8b-instruct",
+    );
+    expect(settings["llm.model"]).toBe("SambaNova/Meta-Llama-3.1-8B-Instruct");
   });
 });

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from storage.org import Org
 from storage.org_member_store import OrgMemberStore
+from storage.org_store import OrgStore
 from storage.user import User
 
 
@@ -69,6 +70,7 @@ class OrgLLMSettingsStore:
 
         # Apply updates to org (excludes llm_api_key which is member-only)
         update_data.apply_to_org(org)
+        OrgStore.sync_agent_settings(org)
 
         # Propagate relevant settings to all org members
         member_updates = update_data.get_member_updates()

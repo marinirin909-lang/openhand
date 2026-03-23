@@ -17,6 +17,14 @@ from storage.user_settings import UserSettings
 
 from openhands.storage.data_models.settings import Settings
 
+# Only these agent_settings keys are stored per member; org-wide settings live on Org.
+_MEMBER_SCOPED_AGENT_SETTINGS_KEYS = {
+    'schema_version',
+    'llm.model',
+    'llm.base_url',
+    'max_iterations',
+}
+
 
 class OrgMemberStore:
     """Store for managing organization-member relationships."""
@@ -150,21 +158,39 @@ class OrgMemberStore:
 
     @staticmethod
     def get_kwargs_from_settings(settings: Settings):
-        kwargs = {
-            normalized: getattr(settings, normalized)
-            for c in OrgMember.__table__.columns
-            if (normalized := c.name.lstrip('_')) and hasattr(settings, normalized)
+        return {
+            'llm_api_key': settings.get_secret_agent_setting('llm.api_key'),
+            'llm_model': settings.get_agent_setting('llm.model'),
+            'llm_api_key_for_byor': settings.llm_api_key_for_byor,
+            'llm_base_url': settings.get_agent_setting('llm.base_url'),
+            'max_iterations': settings.get_agent_setting('max_iterations'),
+            'agent_settings': {
+                key: value
+                for key, value in settings.normalized_agent_settings(
+                    strip_secret_values=True
+                ).items()
+                if key in _MEMBER_SCOPED_AGENT_SETTINGS_KEYS
+            },
         }
-        return kwargs
 
     @staticmethod
     def get_kwargs_from_user_settings(user_settings: UserSettings):
-        kwargs = {
-            normalized: getattr(user_settings, normalized)
-            for c in OrgMember.__table__.columns
-            if (normalized := c.name.lstrip('_')) and hasattr(user_settings, normalized)
+        settings = user_settings.to_settings()
+        agent_settings = settings.to_agent_settings()
+        return {
+            'llm_api_key': user_settings.llm_api_key,
+            'llm_model': agent_settings.llm.model,
+            'llm_api_key_for_byor': user_settings.llm_api_key_for_byor,
+            'llm_base_url': agent_settings.llm.base_url,
+            'max_iterations': settings.get_agent_setting('max_iterations'),
+            'agent_settings': {
+                key: value
+                for key, value in settings.normalized_agent_settings(
+                    strip_secret_values=True
+                ).items()
+                if key in _MEMBER_SCOPED_AGENT_SETTINGS_KEYS
+            },
         }
-        return kwargs
 
     @staticmethod
     async def get_org_members_count(

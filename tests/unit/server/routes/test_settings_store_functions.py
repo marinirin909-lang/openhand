@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -6,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from openhands.core.config.mcp_config import MCPConfig, MCPStdioServerConfig
 from openhands.integrations.provider import ProviderToken
 from openhands.integrations.service_types import ProviderType
 from openhands.server.routes.secrets import (
@@ -15,12 +15,54 @@ from openhands.server.routes.secrets import (
 from openhands.server.routes.secrets import (
     check_provider_tokens,
 )
-from openhands.server.routes.settings import store_llm_settings
+from openhands.server.routes.settings import _apply_settings_payload
 from openhands.server.settings import POSTProviderModel
 from openhands.storage import get_file_store
 from openhands.storage.data_models.secrets import Secrets
 from openhands.storage.data_models.settings import Settings
 from openhands.storage.secrets.file_secrets_store import FileSecretsStore
+
+# Minimal SDK schema fixture for tests.
+_TEST_SDK_SCHEMA = {
+    'sections': [
+        {
+            'key': 'llm',
+            'fields': [
+                {'key': 'llm.model', 'secret': False},
+                {'key': 'llm.api_key', 'secret': True},
+                {'key': 'llm.base_url', 'secret': False},
+            ],
+        },
+        {
+            'key': 'condenser',
+            'fields': [
+                {'key': 'condenser.enabled', 'secret': False},
+                {'key': 'condenser.max_size', 'secret': False},
+            ],
+        },
+        {
+            'key': 'verification',
+            'fields': [
+                {'key': 'verification.confirmation_mode', 'secret': False},
+                {'key': 'verification.security_analyzer', 'secret': False},
+            ],
+        },
+    ]
+}
+
+
+def _make_settings(**sdk_vals: Any) -> Settings:
+    """Helper to create Settings with agent_settings."""
+    return Settings(agent_settings=sdk_vals)
+
+
+def _agent_value(settings: Settings, key: str) -> Any:
+    return settings.get_agent_setting(key)
+
+
+def _secret_value(settings: Settings, key: str) -> str | None:
+    secret = settings.get_secret_agent_setting(key)
+    return secret.get_secret_value() if secret else None
 
 
 # Mock functions to simulate the actual functions in settings.py
@@ -113,16 +155,10 @@ async def test_check_provider_tokens_invalid():
 @pytest.mark.asyncio
 async def test_check_provider_tokens_wrong_type():
     """Test check_provider_tokens with unsupported provider type."""
-    # We can't test with an unsupported provider type directly since the model enforces valid types
-    # Instead, we'll test with an empty provider_tokens dictionary
     providers = POSTProviderModel(provider_tokens={})
-
-    # Empty existing provider tokens
     existing_provider_tokens = {}
 
     result = await check_provider_tokens(providers, existing_provider_tokens)
-
-    # Should return empty string for no providers
     assert result == ''
 
 
@@ -130,254 +166,240 @@ async def test_check_provider_tokens_wrong_type():
 async def test_check_provider_tokens_no_tokens():
     """Test check_provider_tokens with no tokens."""
     providers = POSTProviderModel(provider_tokens={})
-
-    # Empty existing provider tokens
     existing_provider_tokens = {}
 
     result = await check_provider_tokens(providers, existing_provider_tokens)
-
-    # Should return empty string when no tokens provided
     assert result == ''
 
 
-# Tests for store_llm_settings
-@pytest.mark.asyncio
-async def test_store_llm_settings_new_settings():
-    """Test store_llm_settings with new settings."""
-    settings = Settings(
-        llm_model='gpt-4',
-        llm_api_key='test-api-key',
-        llm_base_url='https://api.example.com',
+# Tests for _apply_settings_payload (SDK-first settings)
+def test_apply_payload_sdk_keys_stored_and_readable():
+    """SDK dotted keys should be stored in agent_settings and readable via properties."""
+    payload = {
+        'llm.model': 'gpt-4',
+        'llm.api_key': 'test-api-key',
+        'llm.base_url': 'https://api.example.com',
+    }
+
+    result = _apply_settings_payload(payload, None, _TEST_SDK_SCHEMA)
+
+    assert result.agent_settings['llm.model'] == 'gpt-4'
+    assert result.agent_settings['llm.api_key'] == 'test-api-key'
+    assert result.agent_settings['llm.base_url'] == 'https://api.example.com'
+    # Properties read from agent_settings
+    assert _agent_value(result, 'llm.model') == 'gpt-4'
+    assert _secret_value(result, 'llm.api_key') == 'test-api-key'
+    assert _agent_value(result, 'llm.base_url') == 'https://api.example.com'
+
+
+def test_apply_payload_updates_existing():
+    """SDK keys should update existing settings."""
+    existing = _make_settings(
+        **{
+            'llm.model': 'gpt-3.5',
+            'llm.api_key': 'old-api-key',
+            'llm.base_url': 'https://old.example.com',
+        }
     )
 
-    # No existing settings
-    existing_settings = None
+    payload = {
+        'llm.model': 'gpt-4',
+        'llm.api_key': 'new-api-key',
+        'llm.base_url': 'https://new.example.com',
+    }
 
-    result = await store_llm_settings(settings, existing_settings)
+    result = _apply_settings_payload(payload, existing, _TEST_SDK_SCHEMA)
 
-    # Should return settings with the provided values
-    assert result.llm_model == 'gpt-4'
-    assert result.llm_api_key.get_secret_value() == 'test-api-key'
-    assert result.llm_base_url == 'https://api.example.com'
+    assert _agent_value(result, 'llm.model') == 'gpt-4'
+    assert _secret_value(result, 'llm.api_key') == 'new-api-key'
+    assert _agent_value(result, 'llm.base_url') == 'https://new.example.com'
 
 
-@pytest.mark.asyncio
-async def test_store_llm_settings_update_existing():
-    """Test store_llm_settings updates existing settings."""
-    settings = Settings(
-        llm_model='gpt-4',
-        llm_api_key='new-api-key',
-        llm_base_url='https://new.example.com',
+def test_apply_payload_preserves_secrets_when_not_provided():
+    """When the API key is not in the payload, the existing value is preserved."""
+    existing = _make_settings(
+        **{
+            'llm.model': 'gpt-3.5',
+            'llm.api_key': 'existing-api-key',
+        }
     )
 
-    # Create existing settings
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('old-api-key'),
-        llm_base_url='https://old.example.com',
-    )
+    payload = {'llm.model': 'gpt-4'}
 
-    result = await store_llm_settings(settings, existing_settings)
+    result = _apply_settings_payload(payload, existing, _TEST_SDK_SCHEMA)
 
-    # Should return settings with the updated values
-    assert result.llm_model == 'gpt-4'
-    assert result.llm_api_key.get_secret_value() == 'new-api-key'
-    assert result.llm_base_url == 'https://new.example.com'
+    assert _agent_value(result, 'llm.model') == 'gpt-4'
+    assert _secret_value(result, 'llm.api_key') == 'existing-api-key'
+    assert _agent_value(result, 'llm.base_url') is None
 
 
-@pytest.mark.asyncio
-async def test_store_llm_settings_partial_update():
-    """Test store_llm_settings with partial update.
-
-    Note: When llm_base_url is not provided in the update and the model is NOT an
-    openhands model, we attempt to get the URL from litellm.get_api_base().
-    For OpenAI models, this returns https://api.openai.com.
-    """
-    settings = Settings(
-        llm_model='gpt-4',  # Only updating model (not an openhands model)
-        llm_base_url='',  # Explicitly cleared (e.g. basic mode save)
-    )
-
-    # Create existing settings
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('existing-api-key'),
-        llm_base_url='https://existing.example.com',
-    )
-
-    result = await store_llm_settings(settings, existing_settings)
-
-    # Should return settings with updated model but keep API key
-    assert result.llm_model == 'gpt-4'
-    # For SecretStr objects, we need to compare the secret value
-    assert result.llm_api_key.get_secret_value() == 'existing-api-key'
-    # llm_base_url="" is an explicit clear — must not be repopulated via auto-detection
-    assert result.llm_base_url is None
-
-
-@pytest.mark.asyncio
-async def test_store_llm_settings_advanced_view_clear_removes_base_url():
-    """Regression test for #13420: clearing Base URL in Advanced view must persist.
-
-    Before the fix, llm_base_url="" was treated identically to llm_base_url=None,
-    causing the backend to re-run auto-detection and overwrite the user's intent.
-    """
-    settings = Settings(
-        llm_model='gpt-4',
-        llm_base_url='',  # User deleted the field in Advanced view
-    )
-
-    existing_settings = Settings(
-        llm_model='gpt-4',
-        llm_api_key=SecretStr('my-api-key'),
-        llm_base_url='https://my-custom-proxy.example.com',
-    )
-
-    result = await store_llm_settings(settings, existing_settings)
-
-    # The old custom URL must not come back
-    assert result.llm_base_url is None
-
-
-@pytest.mark.asyncio
-async def test_store_llm_settings_mcp_update_preserves_base_url():
-    """Test that saving MCP config (without LLM fields) preserves existing base URL.
-
-    Regression test: When adding an MCP server, the frontend sends only mcp_config
-    and v1_enabled. This should not wipe out the existing llm_base_url.
-    """
-    # Simulate what the MCP add/update/delete mutations send: mcp_config but no LLM fields
-    settings = Settings(
-        mcp_config=MCPConfig(
-            stdio_servers=[
-                MCPStdioServerConfig(
-                    name='my-server',
-                    command='npx',
-                    args=['-y', '@my/mcp-server'],
-                    env={'API_TOKEN': 'secret123', 'ENDPOINT': 'https://example.com'},
-                )
-            ],
-        ),
-    )
-
-    # Create existing settings with a custom base URL
+def test_apply_payload_mcp_update_preserves_existing_llm_settings():
     existing_settings = Settings(
         llm_model='anthropic/claude-sonnet-4-5-20250929',
         llm_api_key=SecretStr('existing-api-key'),
         llm_base_url='https://my-custom-proxy.example.com',
     )
 
-    result = await store_llm_settings(settings, existing_settings)
-
-    # All existing LLM settings should be preserved
-    assert result.llm_model == 'anthropic/claude-sonnet-4-5-20250929'
-    assert result.llm_api_key.get_secret_value() == 'existing-api-key'
-    assert result.llm_base_url == 'https://my-custom-proxy.example.com'
-
-
-@pytest.mark.asyncio
-async def test_store_llm_settings_no_existing_base_url_uses_auto_detection():
-    """Test auto-detection kicks in only when there is no existing base URL.
-
-    When neither the incoming settings nor existing settings have a base URL,
-    auto-detection from litellm should be used.
-    """
-    settings = Settings(
-        llm_model='gpt-4'  # Not an openhands model
+    result = _apply_settings_payload(
+        {
+            'mcp_config': {
+                'stdio_servers': [
+                    {
+                        'name': 'my-server',
+                        'command': 'npx',
+                        'args': ['-y', '@my/mcp-server'],
+                        'env': {
+                            'API_TOKEN': 'secret123',
+                            'ENDPOINT': 'https://example.com',
+                        },
+                    }
+                ]
+            }
+        },
+        existing_settings,
+        _TEST_SDK_SCHEMA,
     )
 
-    # Existing settings without a base URL
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('existing-api-key'),
+    assert _agent_value(result, 'llm.model') == 'anthropic/claude-sonnet-4-5-20250929'
+    assert _secret_value(result, 'llm.api_key') == 'existing-api-key'
+    assert _agent_value(result, 'llm.base_url') == 'https://my-custom-proxy.example.com'
+
+
+def test_apply_payload_preserves_secrets_when_null():
+    """Null/empty secret values in the payload should not overwrite existing secrets."""
+    existing = _make_settings(**{'llm.api_key': 'existing-api-key'})
+
+    payload = {'llm.api_key': None}
+    result = _apply_settings_payload(payload, existing, _TEST_SDK_SCHEMA)
+    assert result.agent_settings['llm.api_key'] == 'existing-api-key'
+
+    payload = {'llm.api_key': ''}
+    result = _apply_settings_payload(payload, existing, _TEST_SDK_SCHEMA)
+    assert result.agent_settings['llm.api_key'] == 'existing-api-key'
+
+
+def test_apply_payload_mcp_preserves_llm_settings():
+    """Non-LLM payloads (e.g. MCP config) should not affect existing LLM settings."""
+    existing = _make_settings(
+        **{
+            'llm.model': 'anthropic/claude-sonnet-4-5-20250929',
+            'llm.api_key': 'existing-api-key',
+            'llm.base_url': 'https://my-custom-proxy.example.com',
+        }
     )
 
-    result = await store_llm_settings(settings, existing_settings)
+    payload = {
+        'mcp_config': {
+            'stdio_servers': [
+                {
+                    'name': 'my-server',
+                    'command': 'npx',
+                    'args': ['-y', '@my/mcp-server'],
+                }
+            ],
+        },
+    }
 
-    assert result.llm_model == 'gpt-4'
-    assert result.llm_api_key.get_secret_value() == 'existing-api-key'
-    # No existing base URL, so auto-detection should set it
-    assert result.llm_base_url == 'https://api.openai.com'
+    result = _apply_settings_payload(payload, existing, _TEST_SDK_SCHEMA)
+
+    assert _agent_value(result, 'llm.model') == 'anthropic/claude-sonnet-4-5-20250929'
+    assert _secret_value(result, 'llm.api_key') == 'existing-api-key'
+    assert _agent_value(result, 'llm.base_url') == 'https://my-custom-proxy.example.com'
 
 
-@pytest.mark.asyncio
-async def test_store_llm_settings_anthropic_model_gets_api_base():
-    """Test store_llm_settings with an Anthropic model.
+def test_apply_payload_non_sdk_flat_keys_applied():
+    """Non-SDK flat keys (language, git, etc.) should still be applied normally."""
+    payload = {
+        'language': 'ja',
+        'git_user_name': 'test-user',
+    }
 
-    For Anthropic models, get_provider_api_base() returns the Anthropic API base URL
-    via ProviderConfigManager.get_provider_model_info().
-    """
-    settings = Settings(
-        llm_model='anthropic/claude-sonnet-4-5-20250929'  # Anthropic model
+    result = _apply_settings_payload(payload, None, _TEST_SDK_SCHEMA)
+
+    assert result.language == 'ja'
+    assert result.git_user_name == 'test-user'
+
+
+def test_apply_payload_verification_stored_and_readable():
+    """Verification SDK keys are stored and readable via properties."""
+    payload = {
+        'verification.confirmation_mode': True,
+        'verification.security_analyzer': 'llm',
+    }
+
+    result = _apply_settings_payload(payload, None, _TEST_SDK_SCHEMA)
+
+    assert _agent_value(result, 'verification.confirmation_mode') is True
+    assert _agent_value(result, 'verification.security_analyzer') == 'llm'
+    assert result.agent_settings['verification.confirmation_mode'] is True
+
+
+def test_legacy_flat_fields_migrate_to_agent_vals():
+    """Loading a Settings with legacy flat fields should migrate to agent_settings."""
+    s = Settings(
+        **{
+            'llm_model': 'gpt-4',
+            'llm_api_key': 'my-key',
+            'llm_base_url': 'https://example.com',
+            'agent': 'CodeActAgent',
+            'confirmation_mode': True,
+        }
     )
 
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('existing-api-key'),
+    assert s.agent_settings['llm.model'] == 'gpt-4'
+    assert s.agent_settings['llm.api_key'] == 'my-key'
+    assert s.agent_settings['llm.base_url'] == 'https://example.com'
+    assert s.agent_settings['agent'] == 'CodeActAgent'
+    assert s.agent_settings['verification.confirmation_mode'] is True
+    assert _agent_value(s, 'llm.model') == 'gpt-4'
+    assert _agent_value(s, 'agent') == 'CodeActAgent'
+
+
+def test_agent_settings_normalized_with_schema_version_and_extras():
+    s = Settings(
+        llm_model='anthropic/claude-sonnet-4-5-20250929',
+        confirmation_mode=True,
+        agent_settings={'max_iterations': 64, 'custom.extra': 'keep-me'},
     )
 
-    result = await store_llm_settings(settings, existing_settings)
+    assert s.agent_settings['schema_version'] == 1
+    assert s.agent_settings['llm.model'] == 'anthropic/claude-sonnet-4-5-20250929'
+    assert s.agent_settings['verification.confirmation_mode'] is True
+    assert s.agent_settings['max_iterations'] == 64
+    assert s.agent_settings['custom.extra'] == 'keep-me'
 
-    assert result.llm_model == 'anthropic/claude-sonnet-4-5-20250929'
-    assert result.llm_api_key.get_secret_value() == 'existing-api-key'
-    # Anthropic models get https://api.anthropic.com via ProviderConfigManager
-    assert result.llm_base_url == 'https://api.anthropic.com'
 
-
-@pytest.mark.asyncio
-async def test_store_llm_settings_litellm_error_logged():
-    """Test that litellm errors are logged when getting api_base fails."""
-    from unittest.mock import patch
-
-    settings = Settings(
-        llm_model='unknown-model-xyz'  # A model that litellm won't recognize
+def test_agent_settings_persistence_strips_secret_values():
+    s = Settings(
+        llm_model='anthropic/claude-sonnet-4-5-20250929',
+        llm_api_key='super-secret',
+        agent_settings={'max_iterations': 64},
     )
 
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('existing-api-key'),
+    persisted = s.normalized_agent_settings(strip_secret_values=True)
+
+    assert persisted['schema_version'] == 1
+    assert persisted['llm.model'] == 'anthropic/claude-sonnet-4-5-20250929'
+    assert persisted['max_iterations'] == 64
+    assert 'llm.api_key' not in persisted
+
+
+def test_openhands_model_settings_remain_user_facing():
+    s = Settings(llm_model='openhands/claude-opus-4-5-20251101')
+
+    assert s.agent_settings['llm.model'] == 'openhands/claude-opus-4-5-20251101'
+    assert s.normalized_agent_settings(strip_secret_values=True)['llm.model'] == (
+        'openhands/claude-opus-4-5-20251101'
     )
 
-    # The function should not raise even if litellm fails
-    with patch('openhands.server.routes.settings.logger') as mock_logger:
-        result = await store_llm_settings(settings, existing_settings)
 
-        # llm_base_url should remain None since litellm couldn't find the model
-        assert result.llm_base_url is None
-        # Either error or debug should have been logged
-        assert mock_logger.error.called or mock_logger.debug.called
+def test_litellm_proxy_model_settings_migrate_back_to_openhands_prefix():
+    s = Settings(agent_settings={'llm.model': 'litellm_proxy/claude-opus-4-5-20251101'})
 
-
-@pytest.mark.asyncio
-async def test_store_llm_settings_openhands_model_gets_default_url():
-    """Test store_llm_settings with openhands model gets LiteLLM proxy URL.
-
-    When llm_base_url is not provided and the model is an openhands model,
-    it gets set to the default LiteLLM proxy URL.
-    """
-    import os
-
-    settings = Settings(
-        llm_model='openhands/claude-sonnet-4-5-20250929'  # openhands model
+    assert s.agent_settings['llm.model'] == 'openhands/claude-opus-4-5-20251101'
+    assert s.normalized_agent_settings(strip_secret_values=True)['llm.model'] == (
+        'openhands/claude-opus-4-5-20251101'
     )
-
-    # Create existing settings
-    existing_settings = Settings(
-        llm_model='gpt-3.5',
-        llm_api_key=SecretStr('existing-api-key'),
-    )
-
-    result = await store_llm_settings(settings, existing_settings)
-
-    # Should return settings with updated model
-    assert result.llm_model == 'openhands/claude-sonnet-4-5-20250929'
-    # For SecretStr objects, we need to compare the secret value
-    assert result.llm_api_key.get_secret_value() == 'existing-api-key'
-    # openhands models get the LiteLLM proxy URL
-    expected_base_url = os.environ.get(
-        'LITE_LLM_API_URL', 'https://llm-proxy.app.all-hands.dev'
-    )
-    assert result.llm_base_url == expected_base_url
 
 
 # Tests for store_provider_tokens

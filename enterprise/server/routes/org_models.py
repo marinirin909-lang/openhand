@@ -315,7 +315,9 @@ class OrgMemberLLMSettings(BaseModel):
 
     def has_updates(self) -> bool:
         """Check if any field is set (not None)."""
-        return any(getattr(self, field) is not None for field in self.model_fields)
+        return any(
+            getattr(self, field) is not None for field in type(self).model_fields
+        )
 
 
 class OrgLLMSettingsUpdate(BaseModel):
@@ -337,7 +339,9 @@ class OrgLLMSettingsUpdate(BaseModel):
 
     def has_updates(self) -> bool:
         """Check if any field is set (not None)."""
-        return any(getattr(self, field) is not None for field in self.model_fields)
+        return any(
+            getattr(self, field) is not None for field in type(self).model_fields
+        )
 
     def apply_to_org(self, org: Org) -> None:
         """Apply non-None settings to the organization model.
@@ -345,7 +349,7 @@ class OrgLLMSettingsUpdate(BaseModel):
         Args:
             org: Organization entity to update in place
         """
-        for field_name in self.model_fields:
+        for field_name in type(self).model_fields:
             value = getattr(self, field_name)
             # Skip llm_api_key - it's only for member propagation, not org-level
             if value is not None and field_name != 'llm_api_key':

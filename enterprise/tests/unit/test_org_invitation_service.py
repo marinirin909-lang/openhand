@@ -332,7 +332,7 @@ class TestAcceptInvitationEmailValidation:
             mock_get_user.return_value = mock_user
             mock_get_member.return_value = None
             mock_settings = MagicMock()
-            mock_settings.llm_api_key = SecretStr('test-key')
+            mock_settings.get_secret_agent_setting.return_value = SecretStr('test-key')
             mock_create_litellm.return_value = mock_settings
             mock_get_org.return_value = mock_org
             mock_update_status.return_value = mock_invitation
@@ -340,12 +340,14 @@ class TestAcceptInvitationEmailValidation:
             # Act
             await OrgInvitationService.accept_invitation(token, user_id)
 
-            # Assert - verify add_user_to_org was called with org's LLM settings
+            # Assert - verify add_user_to_org inherits the org defaults implicitly
+            # instead of duplicating them on the new membership row.
             mock_add_user.assert_called_once()
             call_kwargs = mock_add_user.call_args.kwargs
-            assert call_kwargs['llm_model'] == 'claude-sonnet-4'
-            assert call_kwargs['llm_base_url'] == 'https://api.anthropic.com'
-            assert call_kwargs['max_iterations'] == 100
+            assert call_kwargs['llm_api_key'] == 'test-key'
+            assert 'llm_model' not in call_kwargs
+            assert 'llm_base_url' not in call_kwargs
+            assert 'max_iterations' not in call_kwargs
 
 
 class TestCreateInvitationsBatch:

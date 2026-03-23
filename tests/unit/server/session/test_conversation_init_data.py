@@ -273,6 +273,13 @@ class TestConversationInitDataValidator:
         )
 
 
+def test_conversation_init_data_default_agent_settings_initializes():
+    """Frozen subclasses should still normalize default agent_settings."""
+    init_data = ConversationInitData()
+
+    assert init_data.agent_settings == {'schema_version': 1}
+
+
 def test_conversation_init_data_no_pydantic_frozen_field_warning():
     """Test that ConversationInitData model does not trigger Pydantic UnsupportedFieldAttributeWarning.
 

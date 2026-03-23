@@ -12,14 +12,15 @@ const getSettingsQueryFn = async (): Promise<Settings> => {
 
   return {
     ...settings,
-    condenser_max_size:
-      settings.condenser_max_size ?? DEFAULT_SETTINGS.condenser_max_size,
     search_api_key: settings.search_api_key || "",
     email: settings.email || "",
     git_user_name: settings.git_user_name || DEFAULT_SETTINGS.git_user_name,
     git_user_email: settings.git_user_email || DEFAULT_SETTINGS.git_user_email,
     is_new_user: false,
     v1_enabled: settings.v1_enabled ?? DEFAULT_SETTINGS.v1_enabled,
+    agent_settings_schema:
+      settings.agent_settings_schema ?? DEFAULT_SETTINGS.agent_settings_schema,
+    agent_settings: settings.agent_settings ?? DEFAULT_SETTINGS.agent_settings,
     sandbox_grouping_strategy:
       settings.sandbox_grouping_strategy ??
       DEFAULT_SETTINGS.sandbox_grouping_strategy,

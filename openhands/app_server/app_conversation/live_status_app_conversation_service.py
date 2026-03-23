@@ -84,6 +84,7 @@ from openhands.app_server.utils.llm_metadata import (
     get_llm_metadata,
     should_set_litellm_extra_body,
 )
+from openhands.core.config.mcp_config import MCPConfig
 from openhands.integrations.provider import PROVIDER_TOKEN_TYPE, ProviderType
 from openhands.integrations.service_types import SuggestedTask
 from openhands.sdk import Agent, AgentContext, LocalWorkspace
@@ -91,6 +92,7 @@ from openhands.sdk.hooks import HookConfig
 from openhands.sdk.llm import LLM
 from openhands.sdk.plugin import PluginSource
 from openhands.sdk.secret import LookupSecret, SecretValue, StaticSecret
+from openhands.sdk.settings import AgentSettings
 from openhands.sdk.utils.paging import page_iterator
 from openhands.sdk.workspace.remote.async_remote_workspace import AsyncRemoteWorkspace
 from openhands.server.types import AppMode
@@ -374,11 +376,12 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
             # Set security analyzer from settings
             user = await self.user_context.get_user_info()
+            verification_settings = user.to_agent_settings().verification
             await self._set_security_analyzer_from_settings(
                 agent_server_url,
                 sandbox.session_api_key,
                 info.id,
-                user.security_analyzer,
+                verification_settings.security_analyzer,
                 self.httpx_client,
             )
 
@@ -878,6 +881,19 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
         return secrets
 
+    def _get_agent_settings(
+        self, user: UserInfo, llm_model: str | None
+    ) -> AgentSettings:
+        """Resolve SDK ``AgentSettings`` for this request."""
+        settings = user.to_agent_settings()
+        if llm_model is not None:
+            settings = settings.model_copy(
+                update={
+                    'llm': settings.llm.model_copy(update={'model': llm_model}),
+                }
+            )
+        return settings
+
     def _configure_llm(self, user: UserInfo, llm_model: str | None) -> LLM:
         """Configure LLM settings.
 
@@ -888,16 +904,14 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
         Returns:
             Configured LLM instance
         """
-        model = llm_model or user.llm_model
-        base_url = user.llm_base_url
-        if model and model.startswith('openhands/'):
-            base_url = user.llm_base_url or self.openhands_provider_base_url
+        agent_settings = self._get_agent_settings(user, llm_model)
+        llm_settings = agent_settings.llm.model_copy(deep=True)
 
-        return LLM(
-            model=model,
-            base_url=base_url,
-            api_key=user.llm_api_key,
-            usage_id='agent',
+        return LLM.model_validate(
+            {
+                **llm_settings.model_dump(mode='python'),
+                'usage_id': 'agent',
+            }
         )
 
     async def _get_tavily_api_key(self, user: UserInfo) -> str | None:
@@ -1037,29 +1051,28 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
     def _merge_custom_mcp_config(
         self, mcp_servers: dict[str, Any], user: UserInfo
     ) -> None:
-        """Merge custom MCP configuration from user settings.
-
-        Args:
-            mcp_servers: Dictionary to add servers to
-            user: User information containing custom MCP config
-        """
-        if not user.mcp_config:
+        """Merge custom MCP configuration from canonical SDK agent settings."""
+        user_mcp_config = user.to_agent_settings().mcp_config
+        if not user_mcp_config:
             return
 
         try:
-            sse_count = len(user.mcp_config.sse_servers)
-            shttp_count = len(user.mcp_config.shttp_servers)
-            stdio_count = len(user.mcp_config.stdio_servers)
+            typed_mcp_config = MCPConfig.model_validate(user_mcp_config)
+            sse_servers = typed_mcp_config.sse_servers
+            shttp_servers = typed_mcp_config.shttp_servers
+            stdio_servers = typed_mcp_config.stdio_servers
+            sse_count = len(sse_servers)
+            shttp_count = len(shttp_servers)
+            stdio_count = len(stdio_servers)
 
             _logger.info(
                 f'Loading custom MCP config from user settings: '
                 f'{sse_count} SSE, {shttp_count} SHTTP, {stdio_count} STDIO servers'
             )
 
-            # Add each type of custom server
-            self._add_custom_sse_servers(mcp_servers, user.mcp_config.sse_servers)
-            self._add_custom_shttp_servers(mcp_servers, user.mcp_config.shttp_servers)
-            self._add_custom_stdio_servers(mcp_servers, user.mcp_config.stdio_servers)
+            self._add_custom_sse_servers(mcp_servers, sse_servers)
+            self._add_custom_shttp_servers(mcp_servers, shttp_servers)
+            self._add_custom_stdio_servers(mcp_servers, stdio_servers)
 
             _logger.info(
                 f'Successfully merged custom MCP config: added {sse_count} SSE, '
@@ -1071,7 +1084,6 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
                 f'Error loading custom MCP config from user settings: {e}',
                 exc_info=True,
             )
-            # Continue with system config only, don't fail conversation startup
             _logger.warning(
                 'Continuing with system-generated MCP config only due to custom config error'
             )
@@ -1106,78 +1118,67 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
         return llm, mcp_config
 
-    def _create_agent_with_context(
+    def _create_agent(
         self,
         llm: LLM,
         agent_type: AgentType,
         system_message_suffix: str | None,
         mcp_config: dict,
-        condenser_max_size: int | None,
         secrets: dict[str, SecretValue] | None = None,
         git_provider: ProviderType | None = None,
         working_dir: str | None = None,
+        agent_settings: AgentSettings | None = None,
     ) -> Agent:
-        """Create an agent with appropriate tools and context based on agent type.
+        """Create an agent from fully-resolved settings.
 
-        Args:
-            llm: Configured LLM instance
-            agent_type: Type of agent to create (PLAN or DEFAULT)
-            system_message_suffix: Optional suffix for system messages
-            mcp_config: MCP configuration dictionary
-            condenser_max_size: condenser_max_size setting
-            secrets: Optional dictionary of secrets for authentication
-            git_provider: Optional git provider type for computing plan path
-            working_dir: Optional working directory for computing plan path
-
-        Returns:
-            Configured Agent instance with context
+        Supplies runtime-determined fields (tools, agent context, MCP
+        config, system-prompt overrides) and delegates to
+        ``AgentSettings.create_agent()``.
         """
-        # Create condenser with user's settings
-        condenser = self._create_condenser(llm, agent_type, condenser_max_size)
-
-        # Create agent based on type
-        if agent_type == AgentType.PLAN:
-            # Compute plan path if working_dir is provided
-            plan_path = None
-            if working_dir:
-                plan_path = self._compute_plan_path(working_dir, git_provider)
-
-            agent = Agent(
-                llm=llm,
-                tools=get_planning_tools(plan_path=plan_path),
-                system_prompt_filename='system_prompt_planning.j2',
-                system_prompt_kwargs={'plan_structure': format_plan_structure()},
-                condenser=condenser,
-                security_analyzer=None,
-                mcp_config=mcp_config,
-            )
-        else:
-            agent = Agent(
-                llm=llm,
-                tools=get_default_tools(enable_browser=True),
-                system_prompt_kwargs={'cli_mode': False},
-                condenser=condenser,
-                mcp_config=mcp_config,
-            )
-
-        # Prepare system message suffix based on agent type
-        effective_system_message_suffix = system_message_suffix
-        if agent_type == AgentType.PLAN:
-            # Prepend planning-specific instruction to prevent "Ready to proceed?" behavior
-            if system_message_suffix:
-                effective_system_message_suffix = (
-                    f'{PLANNING_AGENT_INSTRUCTION}\n\n{system_message_suffix}'
-                )
-            else:
-                effective_system_message_suffix = PLANNING_AGENT_INSTRUCTION
-
-        # Add agent context
-        agent_context = AgentContext(
-            system_message_suffix=effective_system_message_suffix, secrets=secrets
+        # Tools
+        plan_path = None
+        if agent_type == AgentType.PLAN and working_dir:
+            plan_path = self._compute_plan_path(working_dir, git_provider)
+        tools = (
+            get_planning_tools(plan_path=plan_path)
+            if agent_type == AgentType.PLAN
+            else get_default_tools(enable_browser=True)
         )
-        agent = agent.model_copy(update={'agent_context': agent_context})
 
-        return agent
+        # System message suffix
+        effective_suffix = system_message_suffix
+        if agent_type == AgentType.PLAN:
+            effective_suffix = (
+                f'{PLANNING_AGENT_INSTRUCTION}\n\n{system_message_suffix}'
+                if system_message_suffix
+                else PLANNING_AGENT_INSTRUCTION
+            )
+
+        # Build agent from settings
+        assert agent_settings is not None
+        agent = agent_settings.model_copy(
+            update={
+                'llm': llm,
+                'tools': tools,
+                'mcp_config': mcp_config,
+                'agent_context': AgentContext(
+                    system_message_suffix=effective_suffix,
+                    secrets=secrets,
+                ),
+            }
+        ).create_agent()
+
+        # Agent-type-specific prompt overrides
+        runtime_overrides: dict[str, Any] = {}
+        if agent_type == AgentType.PLAN:
+            runtime_overrides['system_prompt_filename'] = 'system_prompt_planning.j2'
+            runtime_overrides['system_prompt_kwargs'] = {
+                'plan_structure': format_plan_structure()
+            }
+        else:
+            runtime_overrides['system_prompt_kwargs'] = {'cli_mode': False}
+
+        return agent.model_copy(update=runtime_overrides)
 
     def _update_agent_with_llm_metadata(
         self,
@@ -1436,13 +1437,16 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
                 for p in plugins
             ]
 
+        verification_settings = user.to_agent_settings().verification
+
         # Create and return the final request
         return StartConversationRequest(
             conversation_id=conversation_id,
             agent=agent,
             workspace=workspace,
             confirmation_policy=self._select_confirmation_policy(
-                bool(user.confirmation_mode), user.security_analyzer
+                verification_settings.confirmation_mode,
+                verification_settings.security_analyzer,
             ),
             initial_message=final_initial_message,
             secrets=secrets,
@@ -1486,17 +1490,18 @@ class LiveStatusAppConversationService(AppConversationServiceBase):
 
         # Configure LLM and MCP
         llm, mcp_config = await self._configure_llm_and_mcp(user, llm_model)
+        agent_settings = self._get_agent_settings(user, llm_model)
 
-        # Create agent with context
-        agent = self._create_agent_with_context(
+        # Create agent from settings
+        agent = self._create_agent(
             llm,
             agent_type,
             system_message_suffix,
             mcp_config,
-            user.condenser_max_size,
             secrets=secrets,
             git_provider=git_provider,
             working_dir=project_dir,
+            agent_settings=agent_settings,
         )
 
         # Finalize and return the conversation request

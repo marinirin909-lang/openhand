@@ -216,11 +216,11 @@ class LiteLlmManager:
                     None,
                 )
 
-        oss_settings.agent = 'CodeActAgent'
+        oss_settings.set_agent_setting('agent', 'CodeActAgent')
         # Use the model corresponding to the current user settings version
-        oss_settings.llm_model = get_default_litellm_model()
-        oss_settings.llm_api_key = SecretStr(key)
-        oss_settings.llm_base_url = LITE_LLM_API_URL
+        oss_settings.set_agent_setting('llm.model', get_default_litellm_model())
+        oss_settings.set_agent_setting('llm.api_key', SecretStr(key))
+        oss_settings.set_agent_setting('llm.base_url', LITE_LLM_API_URL)
         return oss_settings
 
     @staticmethod
@@ -354,10 +354,16 @@ class LiteLlmManager:
                 # Check if the database key exists in LiteLLM
                 # If not, generate a new key to prevent verification failures later
                 db_key = None
+                legacy_settings = user_settings.to_settings() if user_settings else None
+                legacy_llm_base_url = (
+                    legacy_settings.to_agent_settings().llm.base_url
+                    if legacy_settings
+                    else None
+                )
                 if (
                     user_settings
                     and user_settings.llm_api_key
-                    and user_settings.llm_base_url == LITE_LLM_API_URL
+                    and legacy_llm_base_url == LITE_LLM_API_URL
                 ):
                     db_key = user_settings.llm_api_key
                     if hasattr(db_key, 'get_secret_value'):

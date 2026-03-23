@@ -1,28 +1,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePostHog } from "posthog-js/react";
-import { DEFAULT_SETTINGS } from "#/services/settings";
 import SettingsService from "#/api/settings-service/settings-service.api";
-import { Settings } from "#/types/settings";
+import { MCPConfig, Settings } from "#/types/settings";
 import { useSettings } from "../query/use-settings";
 import { useSelectedOrganizationId } from "#/context/use-selected-organization";
 
-const saveSettingsMutationFn = async (settings: Partial<Settings>) => {
-  const settingsToSave: Partial<Settings> = {
-    ...settings,
-    agent: settings.agent || DEFAULT_SETTINGS.agent,
-    language: settings.language || DEFAULT_SETTINGS.language,
-    llm_api_key:
-      settings.llm_api_key === ""
-        ? ""
-        : settings.llm_api_key?.trim() || undefined,
-    condenser_max_size:
-      settings.condenser_max_size ?? DEFAULT_SETTINGS.condenser_max_size,
-    search_api_key: settings.search_api_key?.trim() || "",
-    git_user_name:
-      settings.git_user_name?.trim() || DEFAULT_SETTINGS.git_user_name,
-    git_user_email:
-      settings.git_user_email?.trim() || DEFAULT_SETTINGS.git_user_email,
-  };
+type SettingsUpdate = Partial<Settings> & Record<string, unknown>;
+
+const saveSettingsMutationFn = async (settings: SettingsUpdate) => {
+  const settingsToSave: SettingsUpdate = { ...settings };
+  delete settingsToSave.agent_settings_schema;
+  delete settingsToSave.agent_settings;
+
+  if (typeof settingsToSave["llm.api_key"] === "string") {
+    const apiKey = settingsToSave["llm.api_key"].trim();
+    settingsToSave["llm.api_key"] = apiKey === "" ? "" : apiKey;
+  }
+
+  if (typeof settingsToSave.search_api_key === "string") {
+    settingsToSave.search_api_key = settingsToSave.search_api_key.trim();
+  }
+  if (typeof settingsToSave.git_user_name === "string") {
+    settingsToSave.git_user_name = settingsToSave.git_user_name.trim();
+  }
+  if (typeof settingsToSave.git_user_email === "string") {
+    settingsToSave.git_user_email = settingsToSave.git_user_email.trim();
+  }
 
   await SettingsService.saveSettings(settingsToSave);
 };
@@ -34,28 +37,21 @@ export const useSaveSettings = () => {
   const { organizationId } = useSelectedOrganizationId();
 
   return useMutation({
-    mutationFn: async (settings: Partial<Settings>) => {
-      const newSettings = { ...currentSettings, ...settings };
+    mutationFn: async (settings: SettingsUpdate) => {
+      const nextMcpConfig = settings.mcp_config as MCPConfig | undefined;
+      const currentMcpConfig = currentSettings?.agent_settings?.mcp_config as
+        | MCPConfig
+        | undefined;
 
-      // Track MCP configuration changes
-      if (
-        settings.mcp_config &&
-        currentSettings?.mcp_config !== settings.mcp_config
-      ) {
-        const hasMcpConfig = !!settings.mcp_config;
-        const sseServersCount = settings.mcp_config?.sse_servers?.length || 0;
-        const stdioServersCount =
-          settings.mcp_config?.stdio_servers?.length || 0;
-
-        // Track MCP configuration usage
+      if (nextMcpConfig && currentMcpConfig !== nextMcpConfig) {
         posthog.capture("mcp_config_updated", {
-          has_mcp_config: hasMcpConfig,
-          sse_servers_count: sseServersCount,
-          stdio_servers_count: stdioServersCount,
+          has_mcp_config: true,
+          sse_servers_count: nextMcpConfig.sse_servers?.length || 0,
+          stdio_servers_count: nextMcpConfig.stdio_servers?.length || 0,
         });
       }
 
-      await saveSettingsMutationFn(newSettings);
+      await saveSettingsMutationFn(settings);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

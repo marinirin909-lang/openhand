@@ -522,10 +522,11 @@ class SaasNestedConversationManager(ConversationManager):
 
         mcp_config = await self._get_mcp_config(user_id)
         if mcp_config:
-            # Merge with any MCP config from settings
-            if settings.mcp_config:
-                mcp_config = mcp_config.merge(settings.mcp_config)
-            # Check again since theoretically merge could return None.
+            settings_mcp_config = settings.to_agent_settings().mcp_config
+            if settings_mcp_config:
+                mcp_config = mcp_config.merge(
+                    MCPConfig.model_validate(settings_mcp_config)
+                )
             if mcp_config:
                 init_conversation['mcp_config'] = mcp_config.model_dump()
 
@@ -855,7 +856,7 @@ class SaasNestedConversationManager(ConversationManager):
             user_id=user_id,
         )
         llm_registry.retry_listner = session._notify_on_llm_retry
-        agent_cls = settings.agent or self.config.default_agent
+        agent_cls = settings.to_agent_settings().agent or self.config.default_agent
         agent_config = self.config.get_agent_config(agent_cls)
         agent = Agent.get_cls(agent_cls)(agent_config, llm_registry)
 

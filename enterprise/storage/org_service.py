@@ -166,6 +166,10 @@ class OrgService:
             OrgMember: New organization member entity (not yet persisted)
         """
         org_member_kwargs = OrgMemberStore.get_kwargs_from_settings(settings)
+        org_member_kwargs['agent_settings'] = {}
+        org_member_kwargs.pop('llm_model', None)
+        org_member_kwargs.pop('llm_base_url', None)
+        org_member_kwargs.pop('max_iterations', None)
         return OrgMember(
             org_id=org_id,
             user_id=parse_uuid(user_id),

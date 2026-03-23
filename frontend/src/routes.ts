@@ -14,6 +14,8 @@ export default [
     route("launch", "routes/launch.tsx"),
     route("settings", "routes/settings.tsx", [
       index("routes/llm-settings.tsx"),
+      route("condenser", "routes/condenser-settings.tsx"),
+      route("verification", "routes/verification-settings.tsx"),
       route("mcp", "routes/mcp-settings.tsx"),
       route("user", "routes/user-settings.tsx"),
       route("integrations", "routes/git-settings.tsx"),

@@ -10,6 +10,37 @@ from storage.org_member import OrgMember
 from storage.org_member_store import OrgMemberStore
 from storage.role import Role
 from storage.user import User
+from storage.user_settings import UserSettings
+
+
+def test_get_kwargs_from_user_settings_uses_agent_settings_as_source_of_truth():
+    user_settings = UserSettings(
+        llm_api_key='legacy-secret',
+        agent_settings={
+            'schema_version': 1,
+            'agent': 'CodeActAgent',
+            'verification.confirmation_mode': True,
+            'verification.security_analyzer': 'llm',
+            'condenser.enabled': False,
+            'condenser.max_size': 128,
+            'llm.model': 'anthropic/claude-sonnet-4-5-20250929',
+            'llm.base_url': 'https://api.example.com',
+            'max_iterations': 42,
+        },
+    )
+
+    kwargs = OrgMemberStore.get_kwargs_from_user_settings(user_settings)
+
+    assert kwargs['llm_api_key'] == 'legacy-secret'
+    assert kwargs['llm_model'] == 'anthropic/claude-sonnet-4-5-20250929'
+    assert kwargs['llm_base_url'] == 'https://api.example.com'
+    assert kwargs['max_iterations'] == 42
+    assert kwargs['agent_settings'] == {
+        'schema_version': 1,
+        'llm.model': 'anthropic/claude-sonnet-4-5-20250929',
+        'llm.base_url': 'https://api.example.com',
+        'max_iterations': 42,
+    }
 
 
 @pytest.fixture

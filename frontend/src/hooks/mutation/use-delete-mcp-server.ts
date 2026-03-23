@@ -11,9 +11,16 @@ export function useDeleteMcpServer() {
 
   return useMutation({
     mutationFn: async (serverId: string): Promise<void> => {
-      if (!settings?.mcp_config) return;
+      const currentConfig = settings?.agent_settings?.mcp_config as
+        | MCPConfig
+        | undefined;
+      if (!currentConfig) return;
 
-      const newConfig: MCPConfig = { ...settings.mcp_config };
+      const newConfig: MCPConfig = {
+        sse_servers: [...currentConfig.sse_servers],
+        stdio_servers: [...currentConfig.stdio_servers],
+        shttp_servers: [...currentConfig.shttp_servers],
+      };
       const [serverType, indexStr] = serverId.split("-");
       const index = parseInt(indexStr, 10);
 
@@ -25,15 +32,12 @@ export function useDeleteMcpServer() {
         newConfig.shttp_servers.splice(index, 1);
       }
 
-      const apiSettings = {
+      await SettingsService.saveSettings({
         mcp_config: newConfig,
-        v1_enabled: settings.v1_enabled,
-      };
-
-      await SettingsService.saveSettings(apiSettings);
+        v1_enabled: settings?.v1_enabled,
+      });
     },
     onSuccess: () => {
-      // Invalidate the settings query to trigger a refetch
       queryClient.invalidateQueries({
         queryKey: ["settings", organizationId],
       });

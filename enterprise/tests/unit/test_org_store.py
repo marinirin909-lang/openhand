@@ -277,7 +277,7 @@ def test_get_kwargs_from_settings():
     settings = Settings(
         language='es',
         agent='CodeActAgent',
-        llm_model='gpt-4',
+        llm_model='anthropic/claude-sonnet-4-5-20250929',
         llm_api_key=SecretStr('test-key'),
         enable_sound_notifications=True,
     )
@@ -287,8 +287,13 @@ def test_get_kwargs_from_settings():
     # Should only include fields that exist in Org model
     assert 'agent' in kwargs
     assert 'default_llm_model' in kwargs
+    assert 'agent_settings' in kwargs
     assert kwargs['agent'] == 'CodeActAgent'
-    assert kwargs['default_llm_model'] == 'gpt-4'
+    assert kwargs['default_llm_model'] == 'anthropic/claude-sonnet-4-5-20250929'
+    assert kwargs['agent_settings']['agent'] == 'CodeActAgent'
+    assert (
+        kwargs['agent_settings']['llm.model'] == 'anthropic/claude-sonnet-4-5-20250929'
+    )
     # Should not include fields that don't exist in Org model
     assert 'language' not in kwargs  # language is not in Org model
     assert 'llm_api_key' not in kwargs
@@ -1063,6 +1068,7 @@ async def test_update_org_llm_settings_async_with_llm_api_key():
         # Assert - Org is returned
         assert result is not None
         assert result.default_llm_model == 'new-model'
+        assert result.agent_settings['llm.model'] == 'new-model'
 
         # Assert - Member update was called with correct settings
         mock_member_update.assert_called_once()

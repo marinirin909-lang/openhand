@@ -7,7 +7,6 @@ from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.openhands_config import OpenHandsConfig
 from openhands.core.config.sandbox_config import SandboxConfig
 from openhands.core.config.security_config import SecurityConfig
-from openhands.server.routes.settings import convert_to_settings
 from openhands.storage.data_models.settings import Settings
 
 
@@ -38,13 +37,19 @@ def test_settings_from_config():
 
         assert settings is not None
         assert settings.language == 'en'
-        assert settings.agent == 'test-agent'
-        assert settings.max_iterations == 100
-        assert settings.security_analyzer == 'test-analyzer'
-        assert settings.confirmation_mode is True
-        assert settings.llm_model == 'test-model'
-        assert settings.llm_api_key.get_secret_value() == 'test-key'
-        assert settings.llm_base_url == 'https://test.example.com'
+        assert settings.get_agent_setting('agent') == 'test-agent'
+        assert settings.get_agent_setting('max_iterations') == 100
+        assert (
+            settings.get_agent_setting('verification.security_analyzer')
+            == 'test-analyzer'
+        )
+        assert settings.get_agent_setting('verification.confirmation_mode') is True
+        assert settings.get_agent_setting('llm.model') == 'test-model'
+        assert (
+            settings.get_secret_agent_setting('llm.api_key').get_secret_value()
+            == 'test-key'
+        )
+        assert settings.get_agent_setting('llm.base_url') == 'https://test.example.com'
         assert settings.remote_runtime_resource_factor == 2
         assert not settings.secrets_store.provider_tokens
 
@@ -87,18 +92,56 @@ def test_settings_handles_sensitive_data():
         remote_runtime_resource_factor=2,
     )
 
-    assert str(settings.llm_api_key) == '**********'
-    assert settings.llm_api_key.get_secret_value() == 'test-key'
+    llm_api_key = settings.get_secret_agent_setting('llm.api_key')
+    assert str(llm_api_key) == '**********'
+    assert llm_api_key.get_secret_value() == 'test-key'
 
 
-def test_convert_to_settings():
-    settings_with_token_data = Settings(
-        llm_api_key='test-key',
+def test_settings_preserve_agent_settings():
+    settings = Settings(
+        agent_settings={
+            'llm.api_key': 'test-key',
+            'verification.critic_enabled': True,
+            'verification.critic_mode': 'all_actions',
+            'llm.litellm_extra_body': {'metadata': {'tier': 'pro'}},
+        },
     )
 
-    settings = convert_to_settings(settings_with_token_data)
+    assert (
+        settings.get_secret_agent_setting('llm.api_key').get_secret_value()
+        == 'test-key'
+    )
+    assert settings.agent_settings == {
+        'schema_version': 1,
+        'llm.api_key': 'test-key',
+        'verification.critic_enabled': True,
+        'verification.critic_mode': 'all_actions',
+        'llm.litellm_extra_body': {'metadata': {'tier': 'pro'}},
+    }
 
-    assert settings.llm_api_key.get_secret_value() == 'test-key'
+
+def test_settings_to_agent_settings_uses_agent_vals():
+    settings = Settings(
+        agent_settings={
+            'llm.model': 'sdk-model',
+            'llm.base_url': 'https://sdk.example.com',
+            'llm.litellm_extra_body': {'metadata': {'tier': 'enterprise'}},
+            'condenser.enabled': False,
+            'condenser.max_size': 88,
+            'verification.critic_enabled': True,
+            'verification.critic_mode': 'all_actions',
+        },
+    )
+
+    agent_settings = settings.to_agent_settings()
+
+    assert agent_settings.llm.model == 'sdk-model'
+    assert agent_settings.llm.base_url == 'https://sdk.example.com'
+    assert agent_settings.llm.litellm_extra_body == {'metadata': {'tier': 'enterprise'}}
+    assert agent_settings.condenser.enabled is False
+    assert agent_settings.condenser.max_size == 88
+    assert agent_settings.verification.critic_enabled is True
+    assert agent_settings.verification.critic_mode == 'all_actions'
 
 
 def test_settings_no_pydantic_frozen_field_warning():

@@ -17,7 +17,9 @@ class SettingsService {
    * Save the settings to the server. Only valid settings are saved.
    * @param settings - the settings to save
    */
-  static async saveSettings(settings: Partial<Settings>): Promise<boolean> {
+  static async saveSettings(
+    settings: Partial<Settings> & Record<string, unknown>,
+  ): Promise<boolean> {
     const data = await openHands.post("/api/settings", settings);
     return data.status === 200;
   }

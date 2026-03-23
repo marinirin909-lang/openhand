@@ -23,6 +23,15 @@ from storage.user_settings import UserSettings
 from openhands.server.settings import Settings
 
 
+def _agent_value(settings: Settings, key: str):
+    return settings.get_agent_setting(key)
+
+
+def _secret_value(settings: Settings, key: str):
+    secret = settings.get_secret_agent_setting(key)
+    return secret.get_secret_value() if secret else None
+
+
 class TestDefaultInitialBudget:
     """Test cases for DEFAULT_INITIAL_BUDGET configuration."""
 
@@ -122,20 +131,22 @@ class TestLiteLlmManager:
     def mock_settings(self):
         """Create a mock Settings object."""
         settings = Settings()
-        settings.agent = 'TestAgent'
-        settings.llm_model = 'test-model'
-        settings.llm_api_key = SecretStr('test-key')
-        settings.llm_base_url = 'http://test.com'
+        settings.set_agent_setting('agent', 'TestAgent')
+        settings.set_agent_setting('llm.model', 'test-model')
+        settings.set_agent_setting('llm.api_key', SecretStr('test-key'))
+        settings.set_agent_setting('llm.base_url', 'http://test.com')
         return settings
 
     @pytest.fixture
     def mock_user_settings(self):
         """Create a mock UserSettings object."""
         user_settings = UserSettings()
-        user_settings.agent = 'TestAgent'
-        user_settings.llm_model = 'test-model'
+        user_settings.agent_settings = {
+            'agent': 'TestAgent',
+            'llm.model': 'test-model',
+            'llm.base_url': 'http://test.com',
+        }
         user_settings.llm_api_key = SecretStr('test-key')
-        user_settings.llm_base_url = 'http://test.com'
         user_settings.user_version = 4  # Set version to avoid None comparison
         return user_settings
 
@@ -228,10 +239,12 @@ class TestLiteLlmManager:
                     )
 
                     assert result is not None
-                    assert result.agent == 'CodeActAgent'
-                    assert result.llm_model == get_default_litellm_model()
-                    assert result.llm_api_key.get_secret_value() == 'test-key'
-                    assert result.llm_base_url == 'http://test.com'
+                    assert _agent_value(result, 'agent') == 'CodeActAgent'
+                    assert (
+                        _agent_value(result, 'llm.model') == get_default_litellm_model()
+                    )
+                    assert _secret_value(result, 'llm.api_key') == 'test-key'
+                    assert _agent_value(result, 'llm.base_url') == 'http://test.com'
 
     @pytest.mark.asyncio
     async def test_create_entries_cloud_deployment(self, mock_settings, mock_response):
@@ -275,10 +288,10 @@ class TestLiteLlmManager:
             )
 
             assert result is not None
-            assert result.agent == 'CodeActAgent'
-            assert result.llm_model == get_default_litellm_model()
-            assert result.llm_api_key.get_secret_value() == 'test-api-key'
-            assert result.llm_base_url == 'http://test.com'
+            assert _agent_value(result, 'agent') == 'CodeActAgent'
+            assert _agent_value(result, 'llm.model') == get_default_litellm_model()
+            assert _secret_value(result, 'llm.api_key') == 'test-api-key'
+            assert _agent_value(result, 'llm.base_url') == 'http://test.com'
 
             # Verify API calls were made (get_team + user_exists + 4 posts)
             assert mock_client.get.call_count == 2  # get_team + user_exists
@@ -530,10 +543,14 @@ class TestLiteLlmManager:
 
                     # migrate_entries returns the user_settings unchanged
                     assert result is not None
-                    assert result.agent == 'TestAgent'
-                    assert result.llm_model == 'test-model'
+                    effective_settings = result.to_settings()
+                    assert _agent_value(effective_settings, 'agent') == 'TestAgent'
+                    assert _agent_value(effective_settings, 'llm.model') == 'test-model'
                     assert result.llm_api_key.get_secret_value() == 'test-key'
-                    assert result.llm_base_url == 'http://test.com'
+                    assert (
+                        _agent_value(effective_settings, 'llm.base_url')
+                        == 'http://test.com'
+                    )
 
     @pytest.mark.asyncio
     async def test_migrate_entries_no_user_found(self, mock_user_settings):
@@ -654,10 +671,19 @@ class TestLiteLlmManager:
 
                             # migrate_entries returns the user_settings unchanged
                             assert result is not None
-                            assert result.agent == 'TestAgent'
-                            assert result.llm_model == 'test-model'
+                            effective_settings = result.to_settings()
+                            assert (
+                                _agent_value(effective_settings, 'agent') == 'TestAgent'
+                            )
+                            assert (
+                                _agent_value(effective_settings, 'llm.model')
+                                == 'test-model'
+                            )
                             assert result.llm_api_key.get_secret_value() == 'test-key'
-                            assert result.llm_base_url == 'http://test.com'
+                            assert (
+                                _agent_value(effective_settings, 'llm.base_url')
+                                == 'http://test.com'
+                            )
 
                             # Verify migration steps were called:
                             # - 2 GET requests: _get_user, _get_user_keys
@@ -2031,7 +2057,10 @@ class TestLiteLlmManager:
 
                             # downgrade_entries returns the user_settings
                             assert result is not None
-                            assert result.agent == 'TestAgent'
+                            assert (
+                                _agent_value(result.to_settings(), 'agent')
+                                == 'TestAgent'
+                            )
 
                             # Verify downgrade steps were called:
                             # GET requests:
@@ -2065,7 +2094,7 @@ class TestLiteLlmManager:
                     # In local deployment, should return user_settings without
                     # making any LiteLLM calls
                     assert result is not None
-                    assert result.agent == 'TestAgent'
+                    assert _agent_value(result.to_settings(), 'agent') == 'TestAgent'
 
 
 class TestGetAllKeysForUser:

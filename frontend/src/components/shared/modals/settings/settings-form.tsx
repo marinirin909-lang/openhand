@@ -13,6 +13,7 @@ import { BrandButton } from "#/components/features/settings/brand-button";
 import { SettingsInput } from "#/components/features/settings/settings-input";
 import { HelpLink } from "#/ui/help-link";
 import { useSaveSettings } from "#/hooks/mutation/use-save-settings";
+import { getAgentSettingValue } from "#/utils/sdk-settings-schema";
 import { SETTINGS_FORM } from "#/utils/constants";
 
 interface SettingsFormProps {
@@ -41,8 +42,8 @@ export function SettingsForm({ settings, models, onClose }: SettingsFormProps) {
         onClose();
 
         posthog.capture("settings_saved", {
-          LLM_MODEL: newSettings.llm_model,
-          LLM_API_KEY_SET: newSettings.llm_api_key_set ? "SET" : "UNSET",
+          LLM_MODEL: newSettings["llm.model"],
+          LLM_API_KEY_SET: newSettings["llm.api_key"] ? "SET" : "UNSET",
           SEARCH_API_KEY_SET: newSettings.search_api_key ? "SET" : "UNSET",
           REMOTE_RUNTIME_RESOURCE_FACTOR:
             newSettings.remote_runtime_resource_factor,
@@ -68,6 +69,7 @@ export function SettingsForm({ settings, models, onClose }: SettingsFormProps) {
   };
 
   const isLLMKeySet = settings.llm_api_key_set;
+  const currentModel = getAgentSettingValue(settings, "llm.model");
 
   return (
     <div>
@@ -80,7 +82,9 @@ export function SettingsForm({ settings, models, onClose }: SettingsFormProps) {
         <div className="flex flex-col gap-[17px]">
           <ModelSelector
             models={organizeModelsAndProviders(models)}
-            currentModel={settings.llm_model}
+            currentModel={
+              typeof currentModel === "string" ? currentModel : undefined
+            }
             wrapperClassName="!flex-col !gap-[17px]"
             labelClassName={SETTINGS_FORM.LABEL_CLASSNAME}
           />

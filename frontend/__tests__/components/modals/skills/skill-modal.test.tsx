@@ -8,6 +8,7 @@ import V1ConversationService from "#/api/conversation-service/v1-conversation-se
 import { AgentState } from "#/types/agent-state";
 import { useAgentState } from "#/hooks/use-agent-state";
 import SettingsService from "#/api/settings-service/settings-service.api";
+import { DEFAULT_SETTINGS } from "#/services/settings";
 
 // Mock the agent state hook
 vi.mock("#/hooks/use-agent-state", () => ({
@@ -115,6 +116,11 @@ describe("useConversationSkills - V1 API Integration", () => {
     },
   ];
 
+  const buildSettings = (v1Enabled: boolean) => ({
+    ...DEFAULT_SETTINGS,
+    v1_enabled: v1Enabled,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -135,27 +141,9 @@ describe("useConversationSkills - V1 API Integration", () => {
         .spyOn(ConversationService, "getMicroagents")
         .mockResolvedValue({ microagents: mockMicroagents });
 
-      vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
-        v1_enabled: false,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+        buildSettings(false),
+      );
 
       // Act
       renderWithProviders(<SkillsModal onClose={vi.fn()} />);
@@ -172,27 +160,9 @@ describe("useConversationSkills - V1 API Integration", () => {
         microagents: mockMicroagents,
       });
 
-      vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
-        v1_enabled: false,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+        buildSettings(false),
+      );
 
       // Act
       renderWithProviders(<SkillsModal onClose={vi.fn()} />);
@@ -210,27 +180,9 @@ describe("useConversationSkills - V1 API Integration", () => {
         .spyOn(V1ConversationService, "getSkills")
         .mockResolvedValue({ skills: mockSkills });
 
-      vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
-        v1_enabled: true,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+        buildSettings(true),
+      );
 
       // Act
       renderWithProviders(<SkillsModal onClose={vi.fn()} />);
@@ -247,27 +199,9 @@ describe("useConversationSkills - V1 API Integration", () => {
         skills: mockSkills,
       });
 
-      vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
-        v1_enabled: true,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+        buildSettings(true),
+      );
 
       // Act
       renderWithProviders(<SkillsModal onClose={vi.fn()} />);
@@ -279,27 +213,9 @@ describe("useConversationSkills - V1 API Integration", () => {
 
     it("should use v1 API when v1_enabled is true", async () => {
       // Arrange
-      vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
-        v1_enabled: true,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+        buildSettings(true),
+      );
 
       const getSkillsSpy = vi
         .spyOn(V1ConversationService, "getSkills")
@@ -329,27 +245,7 @@ describe("useConversationSkills - V1 API Integration", () => {
 
       const settingsSpy = vi
         .spyOn(SettingsService, "getSettings")
-        .mockResolvedValue({
-          v1_enabled: false,
-          llm_model: "test-model",
-          llm_base_url: "",
-          agent: "test-agent",
-          language: "en",
-          llm_api_key: null,
-          llm_api_key_set: false,
-          search_api_key_set: false,
-          confirmation_mode: false,
-          security_analyzer: null,
-          remote_runtime_resource_factor: null,
-          provider_tokens_set: {},
-          enable_default_condenser: false,
-          condenser_max_size: null,
-          enable_sound_notifications: false,
-          enable_proactive_conversation_starters: false,
-          enable_solvability_analysis: false,
-          user_consents_to_analytics: null,
-          max_budget_per_task: null,
-        });
+        .mockResolvedValue(buildSettings(false));
 
       // Act - Initial render with v1_enabled: false
       const { rerender } = renderWithProviders(
@@ -361,27 +257,7 @@ describe("useConversationSkills - V1 API Integration", () => {
       expect(getMicroagentsSpy).toHaveBeenCalledWith(conversationId);
 
       // Arrange - Change settings to v1_enabled: true
-      settingsSpy.mockResolvedValue({
-        v1_enabled: true,
-        llm_model: "test-model",
-        llm_base_url: "",
-        agent: "test-agent",
-        language: "en",
-        llm_api_key: null,
-        llm_api_key_set: false,
-        search_api_key_set: false,
-        confirmation_mode: false,
-        security_analyzer: null,
-        remote_runtime_resource_factor: null,
-        provider_tokens_set: {},
-        enable_default_condenser: false,
-        condenser_max_size: null,
-        enable_sound_notifications: false,
-        enable_proactive_conversation_starters: false,
-        enable_solvability_analysis: false,
-        user_consents_to_analytics: null,
-        max_budget_per_task: null,
-      });
+      settingsSpy.mockResolvedValue(buildSettings(true));
 
       // Act - Force re-render
       rerender(<SkillsModal onClose={vi.fn()} />);

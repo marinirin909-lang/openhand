@@ -725,14 +725,15 @@ async def get_prompt(
         # placeholder for error handling
         raise ValueError('Settings not found')
 
-    settings_base_url = settings.llm_base_url
+    agent_settings = settings.to_agent_settings()
+    settings_base_url = agent_settings.llm.base_url
     effective_base_url = get_effective_llm_base_url(
-        settings.llm_model,
+        agent_settings.llm.model,
         settings_base_url,
     )
     llm_config = LLMConfig(
-        model=settings.llm_model or '',
-        api_key=settings.llm_api_key,
+        model=agent_settings.llm.model,
+        api_key=agent_settings.llm.api_key,
         base_url=effective_base_url,
     )
 

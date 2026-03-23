@@ -28,6 +28,14 @@ from openhands.server.settings import Settings
 from openhands.storage.settings.settings_store import SettingsStore
 from openhands.utils.llm import is_openhands_model
 
+# Only these agent_settings keys are persisted on org_member; org-wide values live on Org.
+_MEMBER_SCOPED_AGENT_SETTINGS_KEYS = {
+    'schema_version',
+    'llm.model',
+    'llm.base_url',
+    'max_iterations',
+}
+
 
 @dataclass
 class SaasSettingsStore(SettingsStore):
@@ -69,6 +77,41 @@ class SaasSettingsStore(SettingsStore):
                 )
                 return result.scalars().first()
 
+    @staticmethod
+    def _member_scoped_agent_settings(agent_settings: dict) -> dict:
+        return {
+            key: value
+            for key, value in agent_settings.items()
+            if key in _MEMBER_SCOPED_AGENT_SETTINGS_KEYS
+        }
+
+    async def _persist_agent_settings_async(
+        self, org_id: uuid.UUID, agent_settings: dict
+    ) -> None:
+        async with a_session_maker() as session:
+            stmt = (
+                update(OrgMember)
+                .where(
+                    OrgMember.org_id == org_id,
+                    OrgMember.user_id == uuid.UUID(self.user_id),
+                )
+                .values(agent_settings=agent_settings)
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def _persist_org_agent_settings_async(
+        self, org_id: uuid.UUID, agent_settings: dict
+    ) -> None:
+        async with a_session_maker() as session:
+            stmt = (
+                update(Org)
+                .where(Org.id == org_id)
+                .values(agent_settings=agent_settings)
+            )
+            await session.execute(stmt)
+            await session.commit()
+
     async def load(self) -> Settings | None:
         user = await UserStore.get_user_by_id(self.user_id)
         if not user:
@@ -89,6 +132,15 @@ class SaasSettingsStore(SettingsStore):
                 f'Org not found for ID {org_id} as the current org for user {self.user_id}'
             )
             return None
+        org_agent_settings = OrgStore.get_agent_settings_from_org(org)
+        member_settings = Settings(agent_settings=dict(org_member.agent_settings or {}))
+        member_settings.set_agent_setting('llm.model', org_member.llm_model)
+        member_settings.set_agent_setting('llm.base_url', org_member.llm_base_url)
+        member_settings.set_agent_setting('max_iterations', org_member.max_iterations)
+        member_agent_settings = self._member_scoped_agent_settings(
+            member_settings.normalized_agent_settings(strip_secret_values=True)
+        )
+
         kwargs = {
             **{
                 normalized: getattr(org, c.name)
@@ -107,14 +159,9 @@ class SaasSettingsStore(SettingsStore):
             },
         }
         kwargs['llm_api_key'] = org_member.llm_api_key
-        if org_member.max_iterations:
-            kwargs['max_iterations'] = org_member.max_iterations
-        if org_member.llm_model:
-            kwargs['llm_model'] = org_member.llm_model
         if org_member.llm_api_key_for_byor:
             kwargs['llm_api_key_for_byor'] = org_member.llm_api_key_for_byor
-        if org_member.llm_base_url:
-            kwargs['llm_base_url'] = org_member.llm_base_url
+        kwargs['agent_settings'] = {**org_agent_settings, **member_agent_settings}
         if org.v1_enabled is None:
             kwargs['v1_enabled'] = True
         # Apply default if sandbox_grouping_strategy is None in the database
@@ -122,6 +169,10 @@ class SaasSettingsStore(SettingsStore):
             kwargs.pop('sandbox_grouping_strategy', None)
 
         settings = Settings(**kwargs)
+        if org_agent_settings != (org.agent_settings or {}):
+            await self._persist_org_agent_settings_async(org_id, org_agent_settings)
+        if member_agent_settings != (org_member.agent_settings or {}):
+            await self._persist_agent_settings_async(org_id, member_agent_settings)
         return settings
 
     async def store(self, item: Settings):
@@ -178,44 +229,62 @@ class SaasSettingsStore(SettingsStore):
                 )
                 return None
 
+            llm_model = item.get_agent_setting('llm.model')
+            llm_base_url = item.get_agent_setting('llm.base_url')
+            max_iterations = item.get_agent_setting('max_iterations')
+            llm_api_key = item.get_secret_agent_setting('llm.api_key')
+
             # Check if we need to generate an LLM key.
-            if item.llm_base_url == LITE_LLM_API_URL:
+            if llm_base_url == LITE_LLM_API_URL:
                 await self._ensure_api_key(
-                    item, str(org_id), openhands_type=is_openhands_model(item.llm_model)
+                    item, str(org_id), openhands_type=is_openhands_model(llm_model)
                 )
+                llm_api_key = item.get_secret_agent_setting('llm.api_key')
+
+            normalized_agent_settings = item.normalized_agent_settings(
+                strip_secret_values=True
+            )
+            org_agent_settings = OrgStore.org_scoped_agent_settings(
+                normalized_agent_settings
+            )
+            member_agent_settings = self._member_scoped_agent_settings(
+                normalized_agent_settings
+            )
 
             kwargs = item.model_dump(context={'expose_secrets': True})
+            kwargs.pop('agent_settings', None)
             for model in (user, org, org_member):
                 for key, value in kwargs.items():
                     if hasattr(model, key):
                         setattr(model, key, value)
 
-            # Map Settings fields to Org fields with 'default_' prefix
-            # The generic loop above doesn't update these because Org uses
-            # 'default_llm_model' not 'llm_model', etc.
-            # Use exclude_unset to only update explicitly-set fields (allows clearing with null)
-            settings_data = item.model_dump(exclude_unset=True)
-            if 'llm_model' in settings_data:
-                org.default_llm_model = settings_data['llm_model']
-            if 'llm_base_url' in settings_data:
-                org.default_llm_base_url = settings_data['llm_base_url']
-            if 'max_iterations' in settings_data:
-                org.default_max_iterations = settings_data['max_iterations']
+            org.agent_settings = org_agent_settings
+            org_member.agent_settings = member_agent_settings
+
+            # Map explicitly provided SDK-managed settings onto Org defaults.
+            # These values now live in item.agent_settings, so inspect the
+            # dotted keys directly instead of relying on model_dump().
+            if 'llm.model' in item.agent_settings:
+                org.default_llm_model = llm_model
+            if 'llm.base_url' in item.agent_settings:
+                org.default_llm_base_url = llm_base_url
+            if 'max_iterations' in item.agent_settings:
+                org.default_max_iterations = max_iterations
 
             # Propagate LLM settings to all org members
             # This ensures all members see the same LLM configuration when an admin saves
             # Note: Concurrent saves by multiple admins will result in last-write-wins.
             # Consider adding optimistic locking if this becomes a problem.
             member_update_values: dict = {}
-            if item.llm_model is not None:
-                member_update_values['llm_model'] = item.llm_model
-            if item.llm_base_url is not None:
-                member_update_values['llm_base_url'] = item.llm_base_url
-            if item.max_iterations is not None:
-                member_update_values['max_iterations'] = item.max_iterations
-            if item.llm_api_key is not None:
+            if llm_model is not None:
+                member_update_values['llm_model'] = llm_model
+            if llm_base_url is not None:
+                member_update_values['llm_base_url'] = llm_base_url
+            if max_iterations is not None:
+                member_update_values['max_iterations'] = max_iterations
+            if llm_api_key is not None:
                 member_update_values['_llm_api_key'] = encrypt_value(
-                    item.llm_api_key.get_secret_value()
+                    llm_api_key.get_secret_value()
                 )
 
             if member_update_values:
@@ -292,9 +361,11 @@ class SaasSettingsStore(SettingsStore):
         is valid in LiteLLM. If valid, reuses it. Otherwise, generates a new key.
         """
 
+        llm_api_key = item.get_secret_agent_setting('llm.api_key')
+
         # First, check if our current key is valid
-        if item.llm_api_key and not await LiteLlmManager.verify_existing_key(
-            item.llm_api_key.get_secret_value(),
+        if llm_api_key and not await LiteLlmManager.verify_existing_key(
+            llm_api_key.get_secret_value(),
             self.user_id,
             org_id,
             openhands_type=openhands_type,
@@ -317,7 +388,7 @@ class SaasSettingsStore(SettingsStore):
                     None,
                 )
 
-            item.llm_api_key = SecretStr(generated_key)
+            item.set_agent_setting('llm.api_key', SecretStr(generated_key))
             logger.info(
                 'saas_settings_store:store:generated_openhands_key',
                 extra={'user_id': self.user_id},

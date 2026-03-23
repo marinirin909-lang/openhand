@@ -12,11 +12,14 @@ describe("hasAdvancedSettingsSet", () => {
   });
 
   describe("should be true if", () => {
-    test("llm_base_url is set", () => {
+    test("llm.base_url is set", () => {
       expect(
         hasAdvancedSettingsSet({
           ...DEFAULT_SETTINGS,
-          llm_base_url: "test",
+          agent_settings: {
+            ...DEFAULT_SETTINGS.agent_settings,
+            "llm.base_url": "test",
+          },
         }),
       ).toBe(true);
     });
@@ -25,16 +28,22 @@ describe("hasAdvancedSettingsSet", () => {
       expect(
         hasAdvancedSettingsSet({
           ...DEFAULT_SETTINGS,
-          agent: "test",
+          agent_settings: {
+            ...DEFAULT_SETTINGS.agent_settings,
+            agent: "test",
+          },
         }),
       ).toBe(true);
     });
 
-    test("enable_default_condenser is disabled", () => {
+    test("condenser.enabled is disabled", () => {
       // Arrange
       const settings = {
         ...DEFAULT_SETTINGS,
-        enable_default_condenser: false,
+        agent_settings: {
+          ...DEFAULT_SETTINGS.agent_settings,
+          "condenser.enabled": false,
+        },
       };
 
       // Act
@@ -44,11 +53,14 @@ describe("hasAdvancedSettingsSet", () => {
       expect(result).toBe(true);
     });
 
-    test("condenser_max_size is customized above default", () => {
+    test("condenser.max_size is customized above default", () => {
       // Arrange
       const settings = {
         ...DEFAULT_SETTINGS,
-        condenser_max_size: 200,
+        agent_settings: {
+          ...DEFAULT_SETTINGS.agent_settings,
+          "condenser.max_size": 200,
+        },
       };
 
       // Act
@@ -58,11 +70,14 @@ describe("hasAdvancedSettingsSet", () => {
       expect(result).toBe(true);
     });
 
-    test("condenser_max_size is customized below default", () => {
+    test("condenser.max_size is customized below default", () => {
       // Arrange
       const settings = {
         ...DEFAULT_SETTINGS,
-        condenser_max_size: 50,
+        agent_settings: {
+          ...DEFAULT_SETTINGS.agent_settings,
+          "condenser.max_size": 50,
+        },
       };
 
       // Act

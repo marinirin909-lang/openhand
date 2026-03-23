@@ -2,7 +2,7 @@
 Store class for managing organizations.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from server.constants import (
@@ -24,9 +24,67 @@ from storage.user_settings import UserSettings
 from openhands.core.logger import openhands_logger as logger
 from openhands.storage.data_models.settings import Settings
 
+# Only these agent_settings keys are stored on org; user/member secrets remain elsewhere.
+_ORG_SCOPED_AGENT_SETTINGS_KEYS = {
+    'schema_version',
+    'agent',
+    'llm.model',
+    'llm.base_url',
+    'verification.confirmation_mode',
+    'verification.security_analyzer',
+    'condenser.enabled',
+    'condenser.max_size',
+    'max_iterations',
+    'mcp_config',
+}
+
 
 class OrgStore:
     """Store for managing organizations."""
+
+    @staticmethod
+    def org_scoped_agent_settings(agent_settings: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in agent_settings.items()
+            if key in _ORG_SCOPED_AGENT_SETTINGS_KEYS
+        }
+
+    @staticmethod
+    def get_agent_settings_from_org(org: Org) -> dict[str, Any]:
+        raw_agent_settings = getattr(org, 'agent_settings', {})
+        if not isinstance(raw_agent_settings, dict):
+            raw_agent_settings = {}
+
+        settings = Settings(agent_settings=dict(raw_agent_settings))
+        settings.set_agent_setting('agent', getattr(org, 'agent', None))
+        settings.set_agent_setting('llm.model', getattr(org, 'default_llm_model', None))
+        settings.set_agent_setting(
+            'llm.base_url', getattr(org, 'default_llm_base_url', None)
+        )
+        settings.set_agent_setting(
+            'verification.confirmation_mode', getattr(org, 'confirmation_mode', None)
+        )
+        settings.set_agent_setting(
+            'verification.security_analyzer', getattr(org, 'security_analyzer', None)
+        )
+        settings.set_agent_setting(
+            'condenser.enabled', getattr(org, 'enable_default_condenser', None)
+        )
+        settings.set_agent_setting(
+            'condenser.max_size', getattr(org, 'condenser_max_size', None)
+        )
+        settings.set_agent_setting(
+            'max_iterations', getattr(org, 'default_max_iterations', None)
+        )
+        settings.set_agent_setting('mcp_config', getattr(org, 'mcp_config', None))
+        return OrgStore.org_scoped_agent_settings(
+            settings.normalized_agent_settings(strip_secret_values=True)
+        )
+
+    @staticmethod
+    def sync_agent_settings(org: Org) -> None:
+        org.agent_settings = OrgStore.get_agent_settings_from_org(org)
 
     @staticmethod
     async def create_org(
@@ -36,9 +94,11 @@ class OrgStore:
         async with a_session_maker() as session:
             org = Org(**kwargs)
             org.org_version = ORG_SETTINGS_VERSION
-            org.default_llm_model = get_default_litellm_model()
+            if org.default_llm_model is None:
+                org.default_llm_model = get_default_litellm_model()
             if org.v1_enabled is None:
                 org.v1_enabled = DEFAULT_V1_ENABLED
+            OrgStore.sync_agent_settings(org)
             session.add(org)
             await session.commit()
             await session.refresh(org)
@@ -93,7 +153,7 @@ class OrgStore:
                 {
                     'org_version': ORG_SETTINGS_VERSION,
                     'default_llm_model': get_default_litellm_model(),
-                    'llm_base_url': LITE_LLM_API_URL,
+                    'default_llm_base_url': LITE_LLM_API_URL,
                 },
             )
         return org
@@ -184,54 +244,86 @@ class OrgStore:
                 if hasattr(org, key):
                     setattr(org, key, value)
 
+            OrgStore.sync_agent_settings(org)
             await session.commit()
             await session.refresh(org)
             return org
 
     @staticmethod
     def get_kwargs_from_settings(settings: Settings):
-        kwargs = {}
-
-        for c in Org.__table__.columns:
-            # Normalize for lookup
-            normalized = (
-                c.name.removeprefix('_default_').removeprefix('default_').lstrip('_')
-            )
-
-            if not hasattr(settings, normalized):
-                continue
-
-            # ---- FIX: Output key should drop *only* leading "_" but preserve "default" ----
-            key = c.name
-            if key.startswith('_'):
-                key = key[1:]  # remove only the very first leading underscore
-
-            kwargs[key] = getattr(settings, normalized)
-
-        return kwargs
+        agent_settings = settings.to_agent_settings()
+        return {
+            'agent': agent_settings.agent,
+            'default_max_iterations': settings.get_agent_setting('max_iterations'),
+            'security_analyzer': agent_settings.verification.security_analyzer,
+            'confirmation_mode': agent_settings.verification.confirmation_mode,
+            'default_llm_model': agent_settings.llm.model,
+            'default_llm_base_url': agent_settings.llm.base_url,
+            'remote_runtime_resource_factor': getattr(
+                settings, 'remote_runtime_resource_factor', None
+            ),
+            'enable_default_condenser': agent_settings.condenser.enabled,
+            'billing_margin': getattr(settings, 'billing_margin', None),
+            'enable_proactive_conversation_starters': getattr(
+                settings, 'enable_proactive_conversation_starters', None
+            ),
+            'sandbox_base_container_image': getattr(
+                settings, 'sandbox_base_container_image', None
+            ),
+            'sandbox_runtime_container_image': getattr(
+                settings, 'sandbox_runtime_container_image', None
+            ),
+            'search_api_key': getattr(settings, 'search_api_key', None),
+            'sandbox_api_key': getattr(settings, 'sandbox_api_key', None),
+            'max_budget_per_task': getattr(settings, 'max_budget_per_task', None),
+            'enable_solvability_analysis': getattr(
+                settings, 'enable_solvability_analysis', None
+            ),
+            'v1_enabled': getattr(settings, 'v1_enabled', None),
+            'conversation_expiration': getattr(
+                settings, 'conversation_expiration', None
+            ),
+            'condenser_max_size': settings.get_agent_setting('condenser.max_size'),
+            'byor_export_enabled': getattr(settings, 'byor_export_enabled', None),
+            'sandbox_grouping_strategy': getattr(
+                settings, 'sandbox_grouping_strategy', None
+            ),
+            'agent_settings': OrgStore.org_scoped_agent_settings(
+                settings.normalized_agent_settings(strip_secret_values=True)
+            ),
+            'mcp_config': agent_settings.mcp_config,
+        }
 
     @staticmethod
     def get_kwargs_from_user_settings(user_settings: UserSettings):
-        kwargs = {}
-
-        for c in Org.__table__.columns:
-            # Normalize for lookup
-            normalized = (
-                c.name.removeprefix('_default_').removeprefix('default_').lstrip('_')
-            )
-
-            if not hasattr(user_settings, normalized):
-                continue
-
-            # ---- FIX: Output key should drop *only* leading "_" but preserve "default" ----
-            key = c.name
-            if key.startswith('_'):
-                key = key[1:]  # remove only the very first leading underscore
-
-            kwargs[key] = getattr(user_settings, normalized)
-
-        kwargs['org_version'] = user_settings.user_version
-        return kwargs
+        settings = user_settings.to_settings()
+        agent_settings = settings.to_agent_settings()
+        return {
+            'agent': agent_settings.agent,
+            'default_max_iterations': settings.get_agent_setting('max_iterations'),
+            'security_analyzer': agent_settings.verification.security_analyzer,
+            'confirmation_mode': agent_settings.verification.confirmation_mode,
+            'default_llm_model': agent_settings.llm.model,
+            'default_llm_base_url': agent_settings.llm.base_url,
+            'remote_runtime_resource_factor': user_settings.remote_runtime_resource_factor,
+            'enable_default_condenser': agent_settings.condenser.enabled,
+            'billing_margin': user_settings.billing_margin,
+            'enable_proactive_conversation_starters': user_settings.enable_proactive_conversation_starters,
+            'sandbox_base_container_image': user_settings.sandbox_base_container_image,
+            'sandbox_runtime_container_image': user_settings.sandbox_runtime_container_image,
+            'org_version': user_settings.user_version,
+            'agent_settings': OrgStore.org_scoped_agent_settings(
+                settings.normalized_agent_settings(strip_secret_values=True)
+            ),
+            'mcp_config': agent_settings.mcp_config,
+            'search_api_key': user_settings.search_api_key,
+            'sandbox_api_key': user_settings.sandbox_api_key,
+            'max_budget_per_task': user_settings.max_budget_per_task,
+            'enable_solvability_analysis': user_settings.enable_solvability_analysis,
+            'v1_enabled': user_settings.v1_enabled,
+            'condenser_max_size': agent_settings.condenser.max_size,
+            'sandbox_grouping_strategy': user_settings.sandbox_grouping_strategy,
+        }
 
     @staticmethod
     async def persist_org_with_owner(
@@ -433,6 +525,7 @@ class OrgStore:
 
             # Apply updates to org
             llm_settings.apply_to_org(org)
+            OrgStore.sync_agent_settings(org)
 
             # Propagate relevant settings to all org members
             member_updates = llm_settings.get_member_updates()

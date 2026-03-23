@@ -371,9 +371,9 @@ class OrgInvitationService:
             raise InvitationInvalidError('Organization not found')
 
         # Step 5: Add user to organization with inherited org LLM settings
-        # Get the llm_api_key as string (it's SecretStr | None in Settings)
+        llm_api_key_secret = settings.get_secret_agent_setting('llm.api_key')
         llm_api_key = (
-            settings.llm_api_key.get_secret_value() if settings.llm_api_key else ''
+            llm_api_key_secret.get_secret_value() if llm_api_key_secret else ''
         )
 
         await OrgMemberStore.add_user_to_org(
@@ -382,9 +382,6 @@ class OrgInvitationService:
             role_id=invitation.role_id,
             llm_api_key=llm_api_key,
             status='active',
-            llm_model=org.default_llm_model,
-            llm_base_url=org.default_llm_base_url,
-            max_iterations=org.default_max_iterations,
         )
 
         # Step 6: Mark invitation as accepted
