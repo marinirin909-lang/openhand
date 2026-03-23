@@ -1,0 +1,16 @@
+{
+  "name": "simple_finish",
+  "description": "Agent immediately finishes with a simple message",
+  "responses": [
+    {
+      "text": "",
+      "tool_calls": [
+        {
+          "id": "call_finish_1",
+          "name": "finish",
+          "arguments": "{\"message\": \"I have analyzed the issue and completed the task.\"}"
+        }
+      ]
+    }
+  ]
+}
