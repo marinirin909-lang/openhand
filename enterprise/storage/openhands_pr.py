@@ -22,7 +22,7 @@ class OpenhandsPR(Base):  # type: ignore
     repo_id = Column(String, nullable=False, index=True)
     repo_name = Column(String, nullable=False)
     pr_number = Column(Integer, nullable=False, index=True)
-    status = Column(
+    status: Column[PRStatus] = Column(
         Enum(PRStatus),
         nullable=False,
         index=True,

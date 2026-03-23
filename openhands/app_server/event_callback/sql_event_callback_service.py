@@ -48,10 +48,12 @@ class StoredEventCallback(Base):  # type: ignore
     __tablename__ = 'event_callback'
     id = Column(SQLUUID, primary_key=True)
     conversation_id = Column(SQLUUID, nullable=True)
-    status = Column(
+    status: Column[EventCallbackStatus] = Column(
         Enum(EventCallbackStatus), nullable=False, default=EventCallbackStatus.ACTIVE
     )
-    processor = Column(create_json_type_decorator(EventCallbackProcessor))
+    processor: Column[EventCallbackProcessor] = Column(
+        create_json_type_decorator(EventCallbackProcessor)
+    )
     event_kind = Column(String, nullable=True)
     created_at = Column(UtcDateTime, server_default=func.now(), index=True)
     updated_at = Column(UtcDateTime, server_default=func.now(), index=True)
@@ -60,7 +62,9 @@ class StoredEventCallback(Base):  # type: ignore
 class StoredEventCallbackResult(Base):  # type: ignore
     __tablename__ = 'event_callback_result'
     id = Column(SQLUUID, primary_key=True, default=uuid4)
-    status = Column(Enum(EventCallbackResultStatus), nullable=True)
+    status: Column[EventCallbackResultStatus] = Column(
+        Enum(EventCallbackResultStatus), nullable=True
+    )
     event_callback_id = Column(SQLUUID, index=True)
     event_id = Column(String, index=True)
     conversation_id = Column(SQLUUID, index=True)

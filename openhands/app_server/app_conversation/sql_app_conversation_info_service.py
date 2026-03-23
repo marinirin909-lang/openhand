@@ -79,7 +79,7 @@ class StoredConversationMetadata(Base):  # type: ignore
     created_at = Column(DateTime(timezone=True), default=utc_now)  # type: ignore[attr-defined]
 
     trigger = Column(String, nullable=True)
-    pr_number = Column(create_json_type_decorator(list[int]))
+    pr_number: Column[list[int]] = Column(create_json_type_decorator(list[int]))
 
     # Cost and token metrics
     accumulated_cost = Column(Float, default=0.0)

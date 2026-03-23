@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import DECIMAL, Column, DateTime, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -16,7 +17,7 @@ class BillingSession(Base):  # type: ignore
     id = Column(String, primary_key=True)
     user_id = Column(String, nullable=False)
     org_id = Column(UUID(as_uuid=True), ForeignKey('org.id'), nullable=True)
-    status = Column(
+    status: Column[str] = Column(
         Enum(
             'in_progress',
             'completed',
@@ -26,7 +27,7 @@ class BillingSession(Base):  # type: ignore
         ),
         default='in_progress',
     )
-    price = Column(DECIMAL(19, 4), nullable=False)
+    price: Column[Decimal] = Column(DECIMAL(19, 4), nullable=False)
     price_code = Column(String, nullable=False)
     created_at = Column(
         DateTime(timezone=True),

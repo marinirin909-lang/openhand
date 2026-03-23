@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import DECIMAL, Column, DateTime, Enum, Integer, String
 from storage.base import Base
@@ -13,7 +14,7 @@ class SubscriptionAccess(Base):  # type: ignore
     __tablename__ = 'subscription_access'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    status = Column(
+    status: Column[str] = Column(
         Enum(
             'ACTIVE',
             'DISABLED',
@@ -25,7 +26,7 @@ class SubscriptionAccess(Base):  # type: ignore
     user_id = Column(String, nullable=False, index=True)
     start_at = Column(DateTime(timezone=True), nullable=True)
     end_at = Column(DateTime(timezone=True), nullable=True)
-    amount_paid = Column(DECIMAL(19, 4), nullable=True)
+    amount_paid: Column[Decimal] = Column(DECIMAL(19, 4), nullable=True)
     stripe_invoice_payment_id = Column(String, nullable=False)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
     stripe_subscription_id = Column(String, nullable=True, index=True)

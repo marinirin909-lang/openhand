@@ -9,10 +9,10 @@ class Feedback(Base):  # type: ignore
     id = Column(String, primary_key=True)
     version = Column(String, nullable=False)
     email = Column(String, nullable=False)
-    polarity = Column(
+    polarity: Column[str] = Column(
         Enum('positive', 'negative', name='polarity_enum'), nullable=False
     )
-    permissions = Column(
+    permissions: Column[str] = Column(
         Enum('public', 'private', name='permissions_enum'), nullable=False
     )
     trajectory = Column(JSON, nullable=True)

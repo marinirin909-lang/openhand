@@ -71,7 +71,7 @@ class ConversationCallback(Base):  # type: ignore
         nullable=False,
         index=True,
     )
-    status = Column(
+    status: Column[CallbackStatus] = Column(
         SQLEnum(CallbackStatus), nullable=False, default=CallbackStatus.ACTIVE
     )
     processor_type = Column(String, nullable=False)

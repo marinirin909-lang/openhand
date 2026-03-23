@@ -54,12 +54,16 @@ class StoredAppConversationStartTask(Base):  # type: ignore
     __tablename__ = 'app_conversation_start_task'
     id = Column(SQLUUID, primary_key=True)
     created_by_user_id = Column(String, index=True)
-    status = Column(Enum(AppConversationStartTaskStatus), nullable=True)
+    status: Column[AppConversationStartTaskStatus] = Column(
+        Enum(AppConversationStartTaskStatus), nullable=True
+    )
     detail = Column(String, nullable=True)
     app_conversation_id = Column(SQLUUID, nullable=True)
     sandbox_id = Column(String, nullable=True)
     agent_server_url = Column(String, nullable=True)
-    request = Column(create_json_type_decorator(AppConversationStartRequest))
+    request: Column[AppConversationStartRequest] = Column(
+        create_json_type_decorator(AppConversationStartRequest)
+    )
     created_at = Column(UtcDateTime, server_default=func.now(), index=True)
     updated_at = Column(UtcDateTime, onupdate=func.now(), index=True)
 

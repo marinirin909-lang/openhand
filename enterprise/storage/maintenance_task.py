@@ -60,7 +60,7 @@ class MaintenanceTask(Base):  # type: ignore
     __tablename__ = 'maintenance_tasks'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    status = Column(
+    status: Column[MaintenanceTaskStatus] = Column(
         SQLEnum(MaintenanceTaskStatus),
         nullable=False,
         default=MaintenanceTaskStatus.INACTIVE,
