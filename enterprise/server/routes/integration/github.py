@@ -1,27 +1,52 @@
-import asyncio
 import hashlib
 import hmac
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
-from integrations.github.data_collector import GitHubDataCollector
-from integrations.github.github_manager import GithubManager
-from integrations.models import Message, SourceType
-from server.auth.constants import GITHUB_APP_WEBHOOK_SECRET
-from server.auth.token_manager import TokenManager
+from starlette.requests import ClientDisconnect
 
 from openhands.core.logger import openhands_logger as logger
 
-# Environment variable to disable GitHub webhooks
-GITHUB_WEBHOOKS_ENABLED = os.environ.get('GITHUB_WEBHOOKS_ENABLED', '1') in (
-    '1',
-    'true',
-)
 github_integration_router = APIRouter(prefix='/integration')
-token_manager = TokenManager()
-data_collector = GitHubDataCollector()
-github_manager = GithubManager(token_manager, data_collector)
+
+# Lazy-initialized singleton for GitHub manager
+_github_manager = None
+
+
+def _get_github_manager():
+    """Get the GitHub manager singleton, initializing it lazily if needed.
+
+    This lazy initialization pattern allows the module to be imported without
+    requiring environment variables to be set, which is useful for testing.
+    """
+    global _github_manager
+    if _github_manager is None:
+        from integrations.github.data_collector import GitHubDataCollector
+        from integrations.github.github_manager import GithubManager
+        from server.auth.token_manager import TokenManager
+
+        token_manager = TokenManager()
+        data_collector = GitHubDataCollector()
+        _github_manager = GithubManager(token_manager, data_collector)
+    return _github_manager
+
+
+def _get_webhook_secret() -> str:
+    """Get the GitHub webhook secret from environment.
+
+    This function reads the secret at runtime rather than import time,
+    allowing the module to be imported without environment variables set.
+    """
+    return os.environ.get('GITHUB_APP_WEBHOOK_SECRET', '')
+
+
+def _is_webhooks_enabled() -> bool:
+    """Check if GitHub webhooks are enabled.
+
+    Reads the environment variable at runtime for testability.
+    """
+    return os.environ.get('GITHUB_WEBHOOKS_ENABLED', '1') in ('1', 'true')
 
 
 def verify_github_signature(payload: bytes, signature: str):
@@ -30,10 +55,11 @@ def verify_github_signature(payload: bytes, signature: str):
             status_code=403, detail='x-hub-signature-256 header is missing!'
         )
 
+    webhook_secret = _get_webhook_secret()
     expected_signature = (
         'sha256='
         + hmac.new(
-            GITHUB_APP_WEBHOOK_SECRET.encode('utf-8'),
+            webhook_secret.encode('utf-8'),
             msg=payload,
             digestmod=hashlib.sha256,
         ).hexdigest()
@@ -49,7 +75,7 @@ async def github_events(
     x_hub_signature_256: str = Header(None),
 ):
     # Check if GitHub webhooks are enabled
-    if not GITHUB_WEBHOOKS_ENABLED:
+    if not _is_webhooks_enabled():
         logger.info(
             'GitHub webhooks are disabled by GITHUB_WEBHOOKS_ENABLED environment variable'
         )
@@ -59,8 +85,7 @@ async def github_events(
         )
 
     try:
-        # Add timeout to prevent hanging on slow/stalled clients
-        payload = await asyncio.wait_for(request.body(), timeout=15.0)
+        payload = await request.body()
         verify_github_signature(payload, x_hub_signature_256)
 
         payload_data = await request.json()
@@ -72,19 +97,22 @@ async def github_events(
                 content={'error': 'Installation ID is missing in the payload.'},
             )
 
+        # Import Message and SourceType lazily to avoid import-time dependencies
+        from integrations.models import Message, SourceType
+
         message_payload = {'payload': payload_data, 'installation': installation_id}
         message = Message(source=SourceType.GITHUB, message=message_payload)
-        await github_manager.receive_message(message)
+        await _get_github_manager().receive_message(message)
 
         return JSONResponse(
             status_code=200,
             content={'message': 'GitHub events endpoint reached successfully.'},
         )
-    except asyncio.TimeoutError:
-        logger.warning('GitHub webhook request timed out waiting for request body')
+    except ClientDisconnect:
+        logger.debug('GitHub webhook client disconnected before completing request')
         return JSONResponse(
-            status_code=408,
-            content={'error': 'Request timeout - client took too long to send data.'},
+            status_code=499,
+            content={'error': 'Client disconnected.'},
         )
     except Exception as e:
         logger.exception(f'Error processing GitHub event: {e}')
