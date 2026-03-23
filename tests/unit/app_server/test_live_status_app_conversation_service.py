@@ -25,6 +25,9 @@ from openhands.app_server.app_conversation.live_status_app_conversation_service 
     PLANNING_AGENT_INSTRUCTION,
     LiveStatusAppConversationService,
 )
+from openhands.app_server.event_callback.set_title_callback_processor import (
+    SetTitleCallbackProcessor,
+)
 from openhands.app_server.sandbox.sandbox_models import (
     AGENT_SERVER,
     ExposedUrl,
@@ -1699,6 +1702,28 @@ class TestLiveStatusAppConversationService:
             f'but got "{saved_info.title}"'
         )
         assert saved_info.id == conversation_id
+
+    def test_default_set_title_processor_is_added_when_env_flag_is_absent(self):
+        processors = []
+
+        with patch.dict(os.environ, {}, clear=False):
+            self.service._ensure_default_callback_processors(processors)
+
+        assert any(
+            isinstance(processor, SetTitleCallbackProcessor) for processor in processors
+        )
+
+    def test_default_set_title_processor_can_be_disabled_via_env(self):
+        processors = []
+
+        with patch.dict(
+            os.environ, {'OH_DISABLE_SET_TITLE_PROCESSOR': 'true'}, clear=False
+        ):
+            self.service._ensure_default_callback_processors(processors)
+
+        assert not any(
+            isinstance(processor, SetTitleCallbackProcessor) for processor in processors
+        )
 
     @pytest.mark.asyncio
     async def test_configure_llm_and_mcp_with_custom_sse_servers(self):
