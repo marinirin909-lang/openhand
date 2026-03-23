@@ -1,0 +1,146 @@
+# Workflow to notify contributors when their code goes live in a release
+#
+# This workflow can be triggered:
+# 1. Automatically when a production deployment succeeds (via workflow_call)
+# 2. Manually via workflow_dispatch to send notifications for any release
+#
+# To integrate with deploy repo, add a workflow_call to this workflow after
+# successful production deployment.
+name: Notify Release Contributors
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., 1.3.0)'
+        required: true
+        type: string
+      previous_tag:
+        description: 'Previous release tag (auto-detected if empty)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Preview only - do not send emails'
+        required: false
+        type: boolean
+        default: true
+      resolve_emails:
+        description: 'Try to resolve emails from GitHub profiles'
+        required: false
+        type: boolean
+        default: true
+
+  # Can be called from other workflows (e.g., deploy workflow)
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag'
+        required: true
+        type: string
+      previous_tag:
+        description: 'Previous release tag'
+        required: false
+        type: string
+      dry_run:
+        description: 'Preview only'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      RESEND_API_KEY:
+        description: 'Resend API key for sending emails'
+        required: false
+
+jobs:
+  notify-contributors:
+    name: Notify Contributors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for tag comparison
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install resend
+
+      - name: Determine previous tag
+        id: prev_tag
+        run: |
+          RELEASE_TAG="${{ inputs.release_tag }}"
+          PREVIOUS_TAG="${{ inputs.previous_tag }}"
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # Get the tag before the release tag
+            PREVIOUS_TAG=$(git tag --sort=-creatordate | grep -A1 "^${RELEASE_TAG}$" | tail -n1)
+            if [ -z "$PREVIOUS_TAG" ] || [ "$PREVIOUS_TAG" = "$RELEASE_TAG" ]; then
+              echo "Error: Could not determine previous tag"
+              exit 1
+            fi
+          fi
+
+          echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          echo "Using previous tag: $PREVIOUS_TAG"
+
+      - name: Get contributors and generate report
+        id: contributors
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/notify_release_contributors.py \
+            --repo "${{ github.repository }}" \
+            --from-tag "${{ steps.prev_tag.outputs.previous_tag }}" \
+            --to-tag "${{ inputs.release_tag }}" \
+            --output-json contributors.json \
+            --resolve-emails \
+            --dry-run
+
+          # Count contributors
+          CONTRIBUTOR_COUNT=$(jq '.contributors | length' contributors.json)
+          echo "contributor_count=$CONTRIBUTOR_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload contributor report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contributor-report-${{ inputs.release_tag }}
+          path: contributors.json
+
+      - name: Send email notifications
+        if: ${{ !inputs.dry_run && env.RESEND_API_KEY != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          python scripts/notify_release_contributors.py \
+            --repo "${{ github.repository }}" \
+            --from-tag "${{ steps.prev_tag.outputs.previous_tag }}" \
+            --to-tag "${{ inputs.release_tag }}" \
+            --email-provider resend \
+            --from-email "OpenHands Team <contact@all-hands.dev>" \
+            --resolve-emails
+
+      - name: Post summary
+        run: |
+          echo "## 📧 Release Contributor Notification Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** ${{ inputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Release:** ${{ steps.prev_tag.outputs.previous_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Contributors:** ${{ steps.contributors.outputs.contributor_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "⚠️ **DRY RUN** - No emails were sent" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Notification emails sent to contributors" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Contributors" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          jq -r '.contributors[] | "- **\(.name)** (@\(.username)) - \(.commit_count) commit(s)"' contributors.json >> $GITHUB_STEP_SUMMARY
