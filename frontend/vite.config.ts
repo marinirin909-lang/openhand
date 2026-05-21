@@ -1,8 +1,11 @@
 /// <reference types="vitest" />
+/// <reference types="vite-plugin-svgr/client" />
 import { defineConfig, loadEnv } from "vite";
-import react from "@vitejs/plugin-react";
-// eslint-disable-next-line import/no-extraneous-dependencies
 import viteTsconfigPaths from "vite-tsconfig-paths";
+import svgr from "vite-plugin-svgr";
+import { reactRouter } from "@react-router/dev/vite";
+import { configDefaults } from "vitest/config";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ mode }) => {
   const {
@@ -10,7 +13,6 @@ export default defineConfig(({ mode }) => {
     VITE_USE_TLS = "false",
     VITE_FRONTEND_PORT = "3001",
     VITE_INSECURE_SKIP_VERIFY = "false",
-    VITE_WATCH_USE_POLLING = "false",
   } = loadEnv(mode, process.cwd());
 
   const USE_TLS = VITE_USE_TLS === "true";
@@ -22,28 +24,61 @@ export default defineConfig(({ mode }) => {
   const WS_URL = `${WS_PROTOCOL}://${VITE_BACKEND_HOST}/`;
   const FE_PORT = Number.parseInt(VITE_FRONTEND_PORT, 10);
 
-  // check BACKEND_HOST is something like "example.com"
-  if (!VITE_BACKEND_HOST.match(/^([\w\d-]+(\.[\w\d-]+)+(:\d+)?)/)) {
-    throw new Error(
-      `Invalid BACKEND_HOST ${VITE_BACKEND_HOST}, example BACKEND_HOST 127.0.0.1:3000`,
-    );
-  }
-
   return {
-    // depending on your application, base can also be "/"
-    base: "",
     plugins: [
-      react({
-        include: "src/**/*.tsx",
-      }),
+      !process.env.VITEST && reactRouter(),
       viteTsconfigPaths(),
+      svgr(),
+      tailwindcss(),
     ],
-    clearScreen: false,
+    optimizeDeps: {
+      include: [
+        // Pre-bundle ALL dependencies to prevent runtime optimization and page reloads
+        // These are discovered during initial app load:
+        "posthog-js",
+        "@tanstack/react-query",
+        "react-hot-toast",
+        "i18next",
+        "i18next-http-backend",
+        "i18next-browser-languagedetector",
+        "react-i18next",
+        "axios",
+        "date-fns",
+        "@uidotdev/usehooks",
+        "react-icons/fa6",
+        "react-icons/fa",
+        "clsx",
+        "tailwind-merge",
+        "@heroui/react",
+        "lucide-react",
+        "react-select",
+        "react-select/async",
+        "@microlink/react-json-view",
+        "socket.io-client",
+        // These are discovered when launching conversations:
+        "react-icons/vsc",
+        "react-icons/lu",
+        "react-icons/di",
+        "react-icons/io5",
+        "react-icons/io", // Added to prevent runtime optimization
+        "@monaco-editor/react",
+        "react-textarea-autosize",
+        "react-markdown",
+        "remark-gfm",
+        "remark-breaks",
+        "react-syntax-highlighter",
+        "react-syntax-highlighter/dist/esm/styles/prism",
+        "react-syntax-highlighter/dist/esm/styles/hljs",
+        // Terminal dependencies - added to prevent runtime optimization
+        "@xterm/addon-fit",
+        "@xterm/xterm",
+        "@xterm/xterm/css/xterm.css",
+      ],
+    },
     server: {
-      watch: {
-        usePolling: VITE_WATCH_USE_POLLING === "true",
-      },
       port: FE_PORT,
+      host: true,
+      allowedHosts: true,
       proxy: {
         "/api": {
           target: API_URL,
@@ -56,12 +91,26 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: !INSECURE_SKIP_VERIFY,
         },
+        "/socket.io": {
+          target: WS_URL,
+          ws: true,
+          changeOrigin: true,
+          secure: !INSECURE_SKIP_VERIFY,
+          // rewriteWsOrigin: true,
+        },
+      },
+      watch: {
+        ignored: ["**/node_modules/**", "**/.git/**"],
       },
     },
+    ssr: {
+      noExternal: ["react-syntax-highlighter"],
+    },
+    clearScreen: false,
     test: {
       environment: "jsdom",
-      globals: true,
       setupFiles: ["vitest.setup.ts"],
+      exclude: [...configDefaults.exclude, "tests"],
       coverage: {
         reporter: ["text", "json", "html", "lcov", "text-summary"],
         reportsDirectory: "coverage",

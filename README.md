@@ -1,149 +1,180 @@
 <a name="readme-top"></a>
 
-<!--
-*** Thanks for checking out the Best-README-Template. If you have a suggestion
-*** that would make this better, please fork the repo and create a pull request
-*** or simply open an issue with the tag "enhancement".
-*** Don't forget to give the project a star!
-*** Thanks again! Now go create something AMAZING! :D
--->
+<div align="center">
+  <img src="./docs/static/img/logo.png" alt="Logo" width="200">
+  <h1 align="center">OpenHands: Code Less, Make More</h1>
+</div>
 
-<!-- PROJECT SHIELDS -->
-<!--
-*** I'm using markdown "reference style" links for readability.
-*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
-*** See the bottom of this document for the declaration of the reference variables
-*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
-*** https://www.markdownguide.org/basic-syntax/#reference-style-links
--->
 
 <div align="center">
-  <a href="https://github.com/OpenDevin/OpenDevin/graphs/contributors"><img src="https://img.shields.io/github/contributors/opendevin/opendevin?style=for-the-badge&color=blue" alt="Contributors"></a>
-  <a href="https://github.com/OpenDevin/OpenDevin/network/members"><img src="https://img.shields.io/github/forks/opendevin/opendevin?style=for-the-badge&color=blue" alt="Forks"></a>
-  <a href="https://github.com/OpenDevin/OpenDevin/stargazers"><img src="https://img.shields.io/github/stars/opendevin/opendevin?style=for-the-badge&color=blue" alt="Stargazers"></a>
-  <a href="https://github.com/OpenDevin/OpenDevin/issues"><img src="https://img.shields.io/github/issues/opendevin/opendevin?style=for-the-badge&color=blue" alt="Issues"></a>
-  <a href="https://github.com/OpenDevin/OpenDevin/blob/main/LICENSE"><img src="https://img.shields.io/github/license/opendevin/opendevin?style=for-the-badge&color=blue" alt="MIT License"></a>
+  <a href="https://github.com/All-Hands-AI/OpenHands/graphs/contributors"><img src="https://img.shields.io/github/contributors/All-Hands-AI/OpenHands?style=for-the-badge&color=blue" alt="Contributors"></a>
+  <a href="https://github.com/All-Hands-AI/OpenHands/stargazers"><img src="https://img.shields.io/github/stars/All-Hands-AI/OpenHands?style=for-the-badge&color=blue" alt="Stargazers"></a>
+  <a href="https://github.com/All-Hands-AI/OpenHands/blob/main/LICENSE"><img src="https://img.shields.io/github/license/All-Hands-AI/OpenHands?style=for-the-badge&color=blue" alt="MIT License"></a>
   <br/>
-  <a href="https://join.slack.com/t/opendevin/shared_invite/zt-2i1iqdag6-bVmvamiPA9EZUu7oCO6KhA"><img src="https://img.shields.io/badge/Slack-Join%20Us-red?logo=slack&logoColor=white&style=for-the-badge" alt="Join our Slack community"></a>
-  <a href="https://discord.gg/ESHStjSjD4"><img src="https://img.shields.io/badge/Discord-Join%20Us-purple?logo=discord&logoColor=white&style=for-the-badge" alt="Join our Discord community"></a>
-  <a href="https://codecov.io/github/opendevin/opendevin?branch=main"><img alt="CodeCov" src="https://img.shields.io/codecov/c/github/opendevin/opendevin?style=for-the-badge"></a>
+  <a href="https://dub.sh/openhands"><img src="https://img.shields.io/badge/Slack-Join%20Us-red?logo=slack&logoColor=white&style=for-the-badge" alt="Join our Slack community"></a>
+  <a href="https://github.com/All-Hands-AI/OpenHands/blob/main/CREDITS.md"><img src="https://img.shields.io/badge/Project-Credits-blue?style=for-the-badge&color=FFE165&logo=github&logoColor=white" alt="Credits"></a>
+  <br/>
+  <a href="https://docs.all-hands.dev/usage/getting-started"><img src="https://img.shields.io/badge/Documentation-000?logo=googledocs&logoColor=FFE165&style=for-the-badge" alt="Check out the documentation"></a>
+  <a href="https://arxiv.org/abs/2407.16741"><img src="https://img.shields.io/badge/Paper%20on%20Arxiv-000?logoColor=FFE165&logo=arxiv&style=for-the-badge" alt="Paper on Arxiv"></a>
+  <a href="https://docs.google.com/spreadsheets/d/1wOUdFCMyY6Nt0AIqF705KN4JKOWgeI4wUGUP60krXXs/edit?gid=0#gid=0"><img src="https://img.shields.io/badge/Benchmark%20score-000?logoColor=FFE165&logo=huggingface&style=for-the-badge" alt="Evaluation Benchmark Score"></a>
+
+  <!-- Keep these links. Translations will automatically update with the README. -->
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=de">Deutsch</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=es">Español</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=fr">français</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=ja">日本語</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=ko">한국어</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=pt">Português</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=ru">Русский</a> |
+  <a href="https://www.readme-i18n.com/All-Hands-AI/OpenHands?lang=zh">中文</a>
+
+  <hr>
 </div>
 
-<!-- PROJECT LOGO -->
-<div align="center">
-  <img src="./docs/static/img/logo.png" alt="Logo" width="200" height="200">
-  <h1 align="center">OpenDevin: Code Less, Make More</h1>
-  <a href="https://opendevin.github.io/OpenDevin/modules/usage/intro"><img src="https://img.shields.io/badge/Documentation-OpenDevin-blue?logo=googledocs&logoColor=white&style=for-the-badge" alt="Check out the documentation"></a>
-  <a href="https://huggingface.co/spaces/OpenDevin/evaluation"><img src="https://img.shields.io/badge/Evaluation-Benchmark%20on%20HF%20Space-green?style=for-the-badge" alt="Evaluation Benchmark"></a>
-</div>
-<hr>
+Welcome to OpenHands (formerly OpenDevin), a platform for software development agents powered by AI.
 
-Welcome to OpenDevin, a platform for autonomous software engineers, powered by AI and LLMs.
+OpenHands agents can do anything a human developer can: modify code, run commands, browse the web,
+call APIs, and yes—even copy code snippets from StackOverflow.
 
-OpenDevin agents collaborate with human developers to write code, fix bugs, and ship features.
+Learn more at [docs.all-hands.dev](https://docs.all-hands.dev), or [sign up for OpenHands Cloud](https://app.all-hands.dev) to get started.
+
+> [!IMPORTANT]
+> Using OpenHands for work? We'd love to chat! Fill out
+> [this short form](https://docs.google.com/forms/d/e/1FAIpQLSet3VbGaz8z32gW9Wm-Grl4jpt5WgMXPgJ4EDPVmCETCBpJtQ/viewform)
+> to join our Design Partner program, where you'll get early access to commercial features and the opportunity to provide input on our product roadmap.
 
 ![App screenshot](./docs/static/img/screenshot.png)
 
-## ⚡ Getting Started
-OpenDevin works best with the most recent version of Docker, `26.0.0`.
-You must be using Linux, Mac OS, or WSL on Windows.
+## ☁️ OpenHands Cloud
+The easiest way to get started with OpenHands is on [OpenHands Cloud](https://app.all-hands.dev),
+which comes with $20 in free credits for new users.
 
-To start OpenDevin in a docker container, run the following commands in your terminal:
+## 💻 Running OpenHands Locally
 
-> [!WARNING]
-> When you run the following command, files in `./workspace` may be modified or deleted.
+### Option 1: CLI Launcher (Recommended)
 
+The easiest way to run OpenHands locally is using the CLI launcher with [uv](https://docs.astral.sh/uv/). This provides better isolation from your current project's virtual environment and is required for OpenHands' default MCP servers.
+
+**Install uv** (if you haven't already):
+
+See the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) for the latest installation instructions for your platform.
+
+**Launch OpenHands**:
 ```bash
-WORKSPACE_BASE=$(pwd)/workspace
-docker run -it \
-    --pull=always \
-    -e SANDBOX_USER_ID=$(id -u) \
-    -e WORKSPACE_MOUNT_PATH=$WORKSPACE_BASE \
-    -v $WORKSPACE_BASE:/opt/workspace_base \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -p 3000:3000 \
-    --add-host host.docker.internal:host-gateway \
-    --name opendevin-app-$(date +%Y%m%d%H%M%S) \
-    ghcr.io/opendevin/opendevin
+# Launch the GUI server
+uvx --python 3.12 --from openhands-ai openhands serve
+
+# Or launch the CLI
+uvx --python 3.12 --from openhands-ai openhands
 ```
 
-> [!NOTE]
-> By default, this command pulls the `latest` tag, which represents the most recent release of OpenDevin. You have other options as well:
-> - For a specific release version, use `ghcr.io/opendevin/opendevin:<OpenDevin_version>` (replace <OpenDevin_version> with the desired version number).
-> - For the most up-to-date development version, use `ghcr.io/opendevin/opendevin:main`. This version may be **(unstable!)** and is recommended for testing or development purposes only.
-> 
-> Choose the tag that best suits your needs based on stability requirements and desired features.
+You'll find OpenHands running at [http://localhost:3000](http://localhost:3000) (for GUI mode)!
 
-You'll find OpenDevin running at [http://localhost:3000](http://localhost:3000) with access to `./workspace`. To have OpenDevin operate on your code, place it in `./workspace`.
-OpenDevin will only have access to this workspace folder. The rest of your system will not be affected as it runs in a secured docker sandbox.
+### Option 2: Docker
 
-Upon opening OpenDevin, you must select the appropriate `Model` and enter the `API Key` within the settings that should pop up automatically. These can be set at any time by selecting
-the `Settings` button (gear icon) in the UI. If the required `Model` does not exist in the list, you can manually enter it in the text box.
+<details>
+<summary>Click to expand Docker command</summary>
 
-For the development workflow, see [Development.md](https://github.com/OpenDevin/OpenDevin/blob/main/Development.md).
+You can also run OpenHands directly with Docker:
 
-Are you having trouble? Check out our [Troubleshooting Guide](https://opendevin.github.io/OpenDevin/modules/usage/troubleshooting).
+```bash
+docker pull docker.all-hands.dev/all-hands-ai/runtime:0.57-nikolaik
 
-## 🚀 Documentation
+docker run -it --rm --pull=always \
+    -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.57-nikolaik \
+    -e LOG_ALL_EVENTS=true \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v ~/.openhands:/.openhands \
+    -p 3000:3000 \
+    --add-host host.docker.internal:host-gateway \
+    --name openhands-app \
+    docker.all-hands.dev/all-hands-ai/openhands:0.57
+```
 
-To learn more about the project, and for tips on using OpenDevin,
-**check out our [documentation](https://opendevin.github.io/OpenDevin/modules/usage/intro)**.
+</details>
 
-There you'll find resources on how to use different LLM providers (like ollama and Anthropic's Claude),
+> **Note**: If you used OpenHands before version 0.44, you may want to run `mv ~/.openhands-state ~/.openhands` to migrate your conversation history to the new location.
+
+> [!WARNING]
+> On a public network? See our [Hardened Docker Installation Guide](https://docs.all-hands.dev/usage/runtimes/docker#hardened-docker-installation)
+> to secure your deployment by restricting network binding and implementing additional security measures.
+
+### Getting Started
+
+When you open the application, you'll be asked to choose an LLM provider and add an API key.
+[Anthropic's Claude Sonnet 4](https://www.anthropic.com/api) (`anthropic/claude-sonnet-4-20250514`)
+works best, but you have [many options](https://docs.all-hands.dev/usage/llms).
+
+See the [Running OpenHands](https://docs.all-hands.dev/usage/installation) guide for
+system requirements and more information.
+
+## 💡 Other ways to run OpenHands
+
+> [!WARNING]
+> OpenHands is meant to be run by a single user on their local workstation.
+> It is not appropriate for multi-tenant deployments where multiple users share the same instance. There is no built-in authentication, isolation, or scalability.
+>
+> If you're interested in running OpenHands in a multi-tenant environment, check out the source-available, commercially-licensed
+> [OpenHands Cloud Helm Chart](https://github.com/all-Hands-AI/OpenHands-cloud)
+
+You can [connect OpenHands to your local filesystem](https://docs.all-hands.dev/usage/runtimes/docker#connecting-to-your-filesystem),
+interact with it via a [friendly CLI](https://docs.all-hands.dev/usage/how-to/cli-mode),
+run OpenHands in a scriptable [headless mode](https://docs.all-hands.dev/usage/how-to/headless-mode),
+or run it on tagged issues with [a github action](https://docs.all-hands.dev/usage/how-to/github-action).
+
+Visit [Running OpenHands](https://docs.all-hands.dev/usage/installation) for more information and setup instructions.
+
+If you want to modify the OpenHands source code, check out [Development.md](https://github.com/All-Hands-AI/OpenHands/blob/main/Development.md).
+
+Having issues? The [Troubleshooting Guide](https://docs.all-hands.dev/usage/troubleshooting) can help.
+
+## 📖 Documentation
+
+To learn more about the project, and for tips on using OpenHands,
+check out our [documentation](https://docs.all-hands.dev/usage/getting-started).
+
+There you'll find resources on how to use different LLM providers,
 troubleshooting resources, and advanced configuration options.
 
-## 🤝 How to Contribute
+## 🤝 How to Join the Community
 
-OpenDevin is a community-driven project, and we welcome contributions from everyone.
-Whether you're a developer, a researcher, or simply enthusiastic about advancing the field of
-software engineering with AI, there are many ways to get involved:
+OpenHands is a community-driven project, and we welcome contributions from everyone. We do most of our communication
+through Slack, so this is the best place to start, but we also are happy to have you contact us on Github:
 
-- **Code Contributions:** Help us develop new agents, core functionality, the frontend and other interfaces, or sandboxing solutions.
-- **Research and Evaluation:** Contribute to our understanding of LLMs in software engineering, participate in evaluating the models, or suggest improvements.
-- **Feedback and Testing:** Use the OpenDevin toolset, report bugs, suggest features, or provide feedback on usability.
+- [Join our Slack workspace](https://dub.sh/openhands) - Here we talk about research, architecture, and future development.
+- [Read or post Github Issues](https://github.com/All-Hands-AI/OpenHands/issues) - Check out the issues we're working on, or add your own ideas.
 
-For details, please check [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-## 🤖 Join Our Community
-
-Whether you're a developer, a researcher, or simply enthusiastic about OpenDevin, we'd love to have you in our community.
-Let's make software engineering better together!
-
-- [Slack workspace](https://join.slack.com/t/opendevin/shared_invite/zt-2jsrl32uf-fTeeFjNyNYxqSZt5NPY3fA) - Here we talk about research, architecture, and future development.
-- [Discord server](https://discord.gg/ESHStjSjD4) - This is a community-run server for general discussion, questions, and feedback.
+See more about the community in [COMMUNITY.md](./COMMUNITY.md) or find details on contributing in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## 📈 Progress
 
+See the monthly OpenHands roadmap [here](https://github.com/orgs/All-Hands-AI/projects/1) (updated at the maintainer's meeting at the end of each month).
+
 <p align="center">
-  <a href="https://star-history.com/#OpenDevin/OpenDevin&Date">
-    <img src="https://api.star-history.com/svg?repos=OpenDevin/OpenDevin&type=Date" width="500" alt="Star History Chart">
+  <a href="https://star-history.com/#All-Hands-AI/OpenHands&Date">
+    <img src="https://api.star-history.com/svg?repos=All-Hands-AI/OpenHands&type=Date" width="500" alt="Star History Chart">
   </a>
 </p>
 
 ## 📜 License
 
-Distributed under the MIT License. See [`LICENSE`](./LICENSE) for more information.
+Distributed under the MIT License, with the exception of the `enterprise/` folder. See [`LICENSE`](./LICENSE) for more information.
 
-[contributors-shield]: https://img.shields.io/github/contributors/opendevin/opendevin?style=for-the-badge
-[contributors-url]: https://github.com/OpenDevin/OpenDevin/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/opendevin/opendevin?style=for-the-badge
-[forks-url]: https://github.com/OpenDevin/OpenDevin/network/members
-[stars-shield]: https://img.shields.io/github/stars/opendevin/opendevin?style=for-the-badge
-[stars-url]: https://github.com/OpenDevin/OpenDevin/stargazers
-[issues-shield]: https://img.shields.io/github/issues/opendevin/opendevin?style=for-the-badge
-[issues-url]: https://github.com/OpenDevin/OpenDevin/issues
-[license-shield]: https://img.shields.io/github/license/opendevin/opendevin?style=for-the-badge
-[license-url]: https://github.com/OpenDevin/OpenDevin/blob/main/LICENSE
+## 🙏 Acknowledgements
+
+OpenHands is built by a large number of contributors, and every contribution is greatly appreciated! We also build upon other open source projects, and we are deeply thankful for their work.
+
+For a list of open source projects and licenses used in OpenHands, please see our [CREDITS.md](./CREDITS.md) file.
 
 ## 📚 Cite
 
 ```
-@misc{opendevin2024,
-  author       = {{OpenDevin Team}},
-  title        = {{OpenDevin: An Open Platform for AI Software Developers as Generalist Agents}},
-  year         = {2024},
-  version      = {v1.0},
-  howpublished = {\url{https://github.com/OpenDevin/OpenDevin}},
-  note         = {Accessed: ENTER THE DATE YOU ACCESSED THE PROJECT}
+@inproceedings{
+  wang2025openhands,
+  title={OpenHands: An Open Platform for {AI} Software Developers as Generalist Agents},
+  author={Xingyao Wang and Boxuan Li and Yufan Song and Frank F. Xu and Xiangru Tang and Mingchen Zhuge and Jiayi Pan and Yueqi Song and Bowen Li and Jaskirat Singh and Hoang H. Tran and Fuqiang Li and Ren Ma and Mingzhang Zheng and Bill Qian and Yanjun Shao and Niklas Muennighoff and Yizhe Zhang and Binyuan Hui and Junyang Lin and Robert Brennan and Hao Peng and Heng Ji and Graham Neubig},
+  booktitle={The Thirteenth International Conference on Learning Representations},
+  year={2025},
+  url={https://openreview.net/forum?id=OJd3ayDDoF}
 }
 ```
