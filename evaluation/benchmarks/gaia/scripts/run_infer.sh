@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -eo pipefail
 
 source "evaluation/utils/version_control.sh"
@@ -9,7 +9,6 @@ AGENT=$3
 EVAL_LIMIT=$4
 LEVELS=$5
 NUM_WORKERS=$6
-AGENT_CONFIG=$7
 
 if [ -z "$NUM_WORKERS" ]; then
   NUM_WORKERS=1
@@ -18,41 +17,33 @@ fi
 checkout_eval_branch
 
 if [ -z "$AGENT" ]; then
-  echo "Agent not specified, use default CodeActAgent"
-  AGENT="CodeActAgent"
+  echo "Agent not specified, use default GPTSwarmAgent"
+  AGENT="GPTSwarmAgent"
 fi
 
-get_openhands_version
+get_agent_version
 
 if [ -z "$LEVELS" ]; then
   LEVELS="2023_level1"
   echo "Levels not specified, use default $LEVELS"
 fi
 
-get_openhands_version
+get_agent_version
 
 echo "AGENT: $AGENT"
-echo "OPENHANDS_VERSION: $OPENHANDS_VERSION"
+echo "AGENT_VERSION: $AGENT_VERSION"
 echo "MODEL_CONFIG: $MODEL_CONFIG"
 echo "LEVELS: $LEVELS"
 
-COMMAND="poetry run python ./evaluation/benchmarks/gaia/run_infer.py \
+COMMAND="poetry run python ./evaluation/gaia/run_infer.py \
   --agent-cls $AGENT \
   --llm-config $MODEL_CONFIG \
-  --max-iterations 60 \
   --level $LEVELS \
-  --data-split validation \
-  --eval-num-workers $NUM_WORKERS \
-  --eval-note ${OPENHANDS_VERSION}_${LEVELS}"
+  --data-split validation"
 
 if [ -n "$EVAL_LIMIT" ]; then
   echo "EVAL_LIMIT: $EVAL_LIMIT"
   COMMAND="$COMMAND --eval-n-limit $EVAL_LIMIT"
-fi
-
-if [ -n "$AGENT_CONFIG" ]; then
-  echo "AGENT_CONFIG: $AGENT_CONFIG"
-  COMMAND="$COMMAND --agent-config $AGENT_CONFIG"
 fi
 
 # Run the command
